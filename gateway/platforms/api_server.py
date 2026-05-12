@@ -61,6 +61,8 @@ MAX_REQUEST_BYTES = 10_000_000  # 10 MB — accommodates long agent conversation
 CHAT_COMPLETIONS_SSE_KEEPALIVE_SECONDS = 30.0
 MAX_NORMALIZED_TEXT_LENGTH = 65_536  # 64 KB cap for normalized content parts
 MAX_CONTENT_LIST_SIZE = 1_000  # Max items when content is an array
+_DESKTOP_CAPTURE_MIN_CHARS = 280
+_DESKTOP_CAPTURE_TITLE_MAX = 48
 
 
 def _coerce_port(value: Any, default: int = DEFAULT_PORT) -> int:
@@ -283,6 +285,154 @@ def _normalize_multimodal_content(content: Any) -> Any:
         return "\n".join(p["text"] for p in normalized_parts if p.get("text"))
 
     return normalized_parts
+
+
+def _is_desktop_request(request: "web.Request") -> bool:
+    value = request.headers.get("X-Hermes-Desktop-Client", "").strip().lower()
+    return value in {"1", "true", "desktop", "yes"}
+
+
+def _merge_ephemeral_system_prompt(
+    base_prompt: Optional[str],
+    extra_prompt: Optional[str],
+) -> Optional[str]:
+    base = (base_prompt or "").strip()
+    extra = (extra_prompt or "").strip()
+    if base and extra:
+        return f"{base}\n\n{extra}"
+    return base or extra or None
+
+
+def _build_desktop_system_prompt(request: "web.Request") -> Optional[str]:
+    if not _is_desktop_request(request):
+        return None
+
+    features = request.headers.get("X-Hermes-Desktop-Features", "").strip()
+    feature_text = f" 当前宿主声明的能力包括：{features}。" if features else ""
+    return (
+        "你当前运行在 Hermes Desktop 中。"
+        "桌面宿主拥有知识库、Wiki 和笔记沉淀能力。"
+        "当用户的问题依赖本地知识、历史沉淀、Wiki 页面、术语定义、项目约定或已有笔记时，"
+        "请优先通过 hermes_desktop 提供的正式知识工具自行检索和读取，而不是假设前端已经把完整上下文拼进了用户消息。"
+        "如果用户消息里出现 `【hermes_desktop_knowledge_refs】` 代码块或类似结构化引用清单，"
+        "那只是知识条目引用，不是正文；请把其中的 id、标题、来源当作工具读取线索。"
+        "如果用户显式附带了知识条目 id、路径、标题或来源提示，也请把它们视为应进一步调用知识工具读取的线索。"
+        "回答时应尽量标明结论来自哪份知识条目或 Wiki。"
+        "如果本轮产出了可复用的内容，例如方案、研究结论、步骤清单、工作流草稿、决策记录、排障结论或结构化摘要，"
+        "请尽量把输出组织得适合后续沉淀为知识库笔记，并在你认为适合沉淀时给出标题、标签、分类等结构化建议。"
+        "不要向用户解释这些宿主机制本身。"
+        f"{feature_text}"
+    )
+
+
+def _sanitize_capture_title(raw: str) -> str:
+    text = re.sub(r"^#+\s*", "", (raw or "").strip())
+    text = re.sub(r"\s+", " ", text)
+    text = re.sub(r"[\\/:*?\"<>|]", "_", text)
+    return text[:_DESKTOP_CAPTURE_TITLE_MAX].strip(" ._-") or "Hermes 沉淀建议"
+
+
+def _summarize_capture_text(text: str, limit: int = 96) -> str:
+    compact = re.sub(r"\s+", " ", text.strip())
+    if len(compact) <= limit:
+        return compact
+    return compact[:limit].rstrip() + "…"
+
+
+def _slugify_capture_segment(raw: str, fallback: str) -> str:
+    text = (raw or "").strip().lower()
+    text = re.sub(r"[^\w\u4e00-\u9fff-]+", "-", text)
+    text = re.sub(r"-{2,}", "-", text).strip("-")
+    return text[:48] or fallback
+
+
+def _infer_capture_tags(user_text: str, response_text: str) -> List[str]:
+    combined = f"{user_text}\n{response_text}".lower()
+    tags: List[str] = ["hermes-output"]
+    keyword_tags = (
+        ("方案", "plan"),
+        ("计划", "plan"),
+        ("workflow", "workflow"),
+        ("自动化", "automation"),
+        ("研究", "research"),
+        ("总结", "summary"),
+        ("结论", "summary"),
+        ("决策", "decision"),
+        ("排障", "troubleshooting"),
+        ("故障", "troubleshooting"),
+        ("spec", "spec"),
+        ("runbook", "runbook"),
+        ("清单", "checklist"),
+    )
+    for keyword, tag in keyword_tags:
+        if keyword in combined and tag not in tags:
+            tags.append(tag)
+    return tags[:6]
+
+
+def _infer_capture_category(user_text: str, response_text: str, tags: List[str]) -> str:
+    combined = f"{user_text}\n{response_text}".lower()
+    if "workflow" in combined or "automation" in tags:
+        return "automation"
+    if "research" in tags:
+        return "research"
+    if "decision" in tags:
+        return "decisions"
+    if "troubleshooting" in tags or "排障" in combined or "故障" in combined:
+        return "troubleshooting"
+    if "spec" in tags or "方案" in combined or "计划" in combined:
+        return "plans"
+    return "general"
+
+
+def _build_desktop_capture_memory(
+    response_id: str,
+    user_message: Any,
+    final_response: str,
+) -> Optional[Dict[str, Any]]:
+    text = (final_response or "").strip()
+    if len(text) < _DESKTOP_CAPTURE_MIN_CHARS:
+        return None
+
+    normalized_user = _normalize_chat_content(user_message).lower()
+    normalized_text = text.lower()
+    combined = f"{normalized_user}\n{normalized_text}"
+    artifact_keywords = (
+        "方案", "计划", "步骤", "清单", "总结", "结论", "建议", "风险", "下一步",
+        "workflow", "research", "summary", "decision", "checklist", "plan",
+        "runbook", "spec", "draft",
+    )
+    has_structure = (
+        text.count("\n") >= 3
+        or bool(re.search(r"(^|\n)\s*[-*]\s+", text))
+        or bool(re.search(r"(^|\n)\s*\d+\.\s+", text))
+        or bool(re.search(r"(^|\n)#{1,3}\s+", text))
+    )
+
+    if not has_structure and not any(keyword in combined for keyword in artifact_keywords):
+        return None
+
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    if not lines:
+        return None
+    title_line = next((line for line in lines if not line.startswith(">")), lines[0])
+    title = _sanitize_capture_title(title_line)
+    summary = _summarize_capture_text(lines[1] if len(lines) > 1 else lines[0])
+    excerpt = "\n".join(lines[:6])[:600].strip()
+    tags = _infer_capture_tags(normalized_user, text)
+    category = _infer_capture_category(normalized_user, text, tags)
+    note_slug = _slugify_capture_segment(title, "hermes-note")
+
+    return {
+        "id": f"desktop_capture_{response_id}",
+        "summary": f"建议沉淀《{title}》：{summary}",
+        "status": "suggested",
+        "title": title,
+        "tags": tags,
+        "category": category,
+        "note_path": f"notes/{category}/{note_slug}.md",
+        "excerpt": excerpt,
+    }
 
 
 def _content_has_visible_payload(content: Any) -> bool:
@@ -1063,6 +1213,11 @@ class APIServerAdapter(BasePlatformAdapter):
                     return _multimodal_validation_error(exc, param=f"messages[{idx}].content")
                 conversation_messages.append({"role": role, "content": content})
 
+        system_prompt = _merge_ephemeral_system_prompt(
+            system_prompt,
+            _build_desktop_system_prompt(request),
+        )
+
         # Extract the last user message as the primary input
         user_message: Any = ""
         history = []
@@ -1229,6 +1384,7 @@ class APIServerAdapter(BasePlatformAdapter):
                 request, completion_id, model_name, created, _stream_q,
                 agent_task, agent_ref, session_id=session_id,
                 gateway_session_key=gateway_session_key,
+                user_message=user_message,
             )
 
         # Non-streaming: run the agent (with optional Idempotency-Key)
@@ -1277,6 +1433,11 @@ class APIServerAdapter(BasePlatformAdapter):
             finish_reason = "error"
         else:
             finish_reason = "stop"
+        desktop_memory = _build_desktop_capture_memory(
+            completion_id,
+            user_message,
+            final_response,
+        ) if _is_desktop_request(request) else None
 
         response_headers = {
             "X-Hermes-Session-Id": result.get("session_id", session_id),
@@ -1338,12 +1499,16 @@ class APIServerAdapter(BasePlatformAdapter):
             response_headers["X-Hermes-Partial"] = "true" if is_partial else "false"
             if err_msg:
                 response_headers["X-Hermes-Error"] = err_msg[:200]
+        if desktop_memory:
+            response_data["memory"] = desktop_memory
 
         return web.json_response(response_data, headers=response_headers)
 
     async def _write_sse_chat_completion(
         self, request: "web.Request", completion_id: str, model: str,
         created: int, stream_q, agent_task, agent_ref=None, session_id: str = None,
+        gateway_session_key: str = None,
+        user_message: Any = "",
         gateway_session_key: str = None,
     ) -> "web.StreamResponse":
         """Write real streaming SSE from agent's stream_delta_callback queue.
@@ -1438,11 +1603,21 @@ class APIServerAdapter(BasePlatformAdapter):
 
             # Get usage from completed agent
             usage = {"input_tokens": 0, "output_tokens": 0, "total_tokens": 0}
+            result = {}
             try:
                 result, agent_usage = await agent_task
                 usage = agent_usage or usage
             except Exception as exc:
                 logger.warning("Agent task %s failed, usage data lost: %s", completion_id, exc)
+
+            final_response = ""
+            if isinstance(result, dict):
+                final_response = result.get("final_response", "") or result.get("error", "")
+            desktop_memory = _build_desktop_capture_memory(
+                completion_id,
+                user_message,
+                final_response,
+            ) if _is_desktop_request(request) else None
 
             # Finish chunk
             finish_chunk = {
@@ -1455,6 +1630,8 @@ class APIServerAdapter(BasePlatformAdapter):
                     "total_tokens": usage.get("total_tokens", 0),
                 },
             }
+            if desktop_memory:
+                finish_chunk["memory"] = desktop_memory
             await response.write(f"data: {json.dumps(finish_chunk)}\n\n".encode())
             await response.write(b"data: [DONE]\n\n")
         except (ConnectionResetError, ConnectionAbortedError, BrokenPipeError, OSError):
