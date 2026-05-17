@@ -1512,7 +1512,6 @@ class APIServerAdapter(BasePlatformAdapter):
         created: int, stream_q, agent_task, agent_ref=None, session_id: str = None,
         gateway_session_key: str = None,
         user_message: Any = "",
-        gateway_session_key: str = None,
     ) -> "web.StreamResponse":
         """Write real streaming SSE from agent's stream_delta_callback queue.
 
