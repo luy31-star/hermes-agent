@@ -835,6 +835,19 @@ def trigger_job(job_id: str) -> Optional[Dict[str, Any]]:
     )
 
 
+def mark_job_running(job_id: str) -> Optional[Dict[str, Any]]:
+    """Mark a job as currently executing."""
+    return update_job(
+        job_id,
+        {
+            "enabled": True,
+            "state": "running",
+            "last_started_at": _hermes_now().isoformat(),
+            "last_error": None,
+        },
+    )
+
+
 def remove_job(job_id: str) -> bool:
     """Remove a job by ID or name."""
     job = resolve_job_ref(job_id)
