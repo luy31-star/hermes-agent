@@ -856,13 +856,7 @@ CREATE TABLE IF NOT EXISTS tasks (
     -- ``max_retries=1`` blocks on the first failure. NULL (the common
     -- case) falls through to the dispatcher-level ``kanban.failure_limit``
     -- config and then ``DEFAULT_FAILURE_LIMIT``.
-    max_retries          INTEGER,
-    -- Originating chat/agent session id when the task was created from
-    -- inside an agent loop that propagated ``HERMES_SESSION_ID``. NULL
-    -- for tasks created from the CLI, dashboard, or any path that doesn't
-    -- set the env var. Indexed so per-session list queries stay cheap on
-    -- larger boards.
-    session_id           TEXT
+    max_retries          INTEGER
 );
 
 CREATE TABLE IF NOT EXISTS task_links (
