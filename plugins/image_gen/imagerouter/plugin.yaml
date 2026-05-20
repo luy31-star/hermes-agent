@@ -1,0 +1,7 @@
+name: imagerouter
+version: 1.0.0
+description: "ImageRouter image generation - OpenAI-compatible routing service"
+author: luyu
+kind: backend
+requires_env:
+  - IMAGEROUTER_API_KEY
