@@ -156,7 +156,16 @@ TOOLSETS = {
         "tools": ["skills_list", "skill_view", "skill_manage"],
         "includes": []
     },
-    
+
+    "knowledge_vault": {
+        "description": (
+            "Search and retrieve notes from the desktop knowledge vault. "
+            "Only available in desktop mode with DESKTOP_BRIDGE_URL configured."
+        ),
+        "tools": ["knowledge_search", "knowledge_get_note"],
+        "includes": []
+    },
+
     "browser": {
         "description": "Browser automation for web interaction (navigate, click, type, scroll, iframes, hold-click) with web search for finding URLs",
         "tools": [
