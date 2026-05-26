@@ -1,7 +1,7 @@
 ---
 name: video-canvas-director
 description: "通过 Hermes 桌面端的无限画布做生产级 AI 电影。Hermes 是导演 + 制片厂主任，**搭画布不调 API**——按工作流 B（scriptGen → storyboard 风格锚 → 每镜头独立 image × 2 [首帧 + 末帧] → image2video → videoConcat）搭出可视化 pipeline，让用户看到每个镜头的独立分镜节点（占位 idle，运行后才出图）。基于 2026 年 Veo 3.1 / Sora 2 / Seedance 2.0 / Kling 2.6 工业实战。v7.3 强制 Phase Gates：剧本拆解 → 角色 Bible → 镜头规划 → 用户确认后才搭画布；时长按剧情节奏决定，不是模型上限填满。专业知识（题材模板/音频/双关键帧）按需 skill_view 子文件加载。"
-version: 7.3.0
+version: 7.4.0
 license: MIT
 platforms: [macos, linux, windows]
 metadata:
@@ -50,17 +50,72 @@ HERMES → 后续 canvas_add_node / canvas_connect ...
 
 > **Hermes 的工作 = 搭画布 + 写工业级 prompt + 填结构化字段。不直接出图出视频。**
 
+### 🚨 中文 Prompt 强制规则（v7.4 新增）
+
+**所有节点的 prompt 字段统一用中文写**，**不**写英文（除了下面允许的术语白名单）。
+
+理由：
+1. 用户是中文创作者，prompt 直接影响人物服饰 / 场景 / 动作描述，中文表达更精准（例："白衣染尘、剑眉星目、淡金劫光"）
+2. 2026 年的中文图像 / 视频模型（豆包、Seedance、可灵、Veo 3.1 Pro 中文支持、GPT Image 2）对中文理解 ≥ 英文
+3. 英文写"cinematic xianxia dying golden light dim blood"模型只会渲染抽象气氛，**画不出"枷锁道痕"这种具体特征**
+
+**英文术语白名单**（这些保留英文，因为是行业标准词）：
+- 镜头：`extreme-wide / medium / close-up / low-angle / dolly-in / tracking / 35mm` 等（§镜头字段词典）
+- 比例：`16:9 / 9:16`
+- 风格 modifier：`cinematic / film grain / anamorphic / volumetric` 这种 1-2 词的修饰
+- negative prompt：`no text, no watermark, no extra fingers` 这种禁用项
+
+**正确示例**（角色 prompt，约 850 字符）：
+
+```
+白衣少年剑仙——百年道宗承龙脉嫡传弟子，正值天劫破境第七重。
+【面部】剑眉星目，瞳色淡金（劫光余韵），鼻梁高挺，薄唇紧抿，下颌线分明；左眉骨上有一道细疤（前世渡劫旧伤）；
+肤色冷白偏青（劫光淬体痕迹），脸颊有未擦净的血痕；眼神隐忍坚毅、孤勇悲悯，绝不是愤怒少年。
+【发型】乌黑长发束玄铁束发冠，几缕散发垂落额前；发丝末端因劫风半干、有银灰色尘渍。
+【服饰】上身白色道袍（细密暗纹云雷），衣领玄色镶金线；束腰玄色腰带，腰带左侧悬青铜螭龙剑，剑穗为青色丝绦；
+袖口与下摆均染上劫尘灰渍、微微破碎；脚踩玄底白边布履。
+【标志物 / Identity Lock】（每张分镜都必须保留这五项）：
+1. 脖颈与手腕处的玄色枷锁道痕（细如发的暗刻符文）
+2. 左手虎口隐溢血丝
+3. 右手握剑、剑身环绕青色龙鳞光晕
+4. 头顶半丈高处悬浮一缕淡金色劫雷余息
+5. 整体气场带"承重之沉"，身后地面青石微裂
+【风格关键词】中国玄幻武侠水墨电影感 + 35mm anamorphic + teal-amber 调色 + god rays 神性侧逆光 + film grain 颗粒
+【negative】no text, no watermark, no modern objects, no extra fingers, no deformed hands, no face drift, no outfit change, 不要现代元素，不要异色瞳，不要双角色
+```
+
+写 prompt 时**必须**包含这 6 类信息：
+1. 角色基础（一句话定性）
+2. 面部细节（眉/眼/鼻/唇/疤/肤色/眼神）
+3. 发型（颜色 + 长度 + 束法 + 散发处理）
+4. 服饰（材质 + 主色 + 暗纹 + 破损 + 配件）
+5. **Identity Lock 标志物**（≥5 项，跨节点必须保留）
+6. negative prompt（≥7 项）
+
+**字符数硬阈值**（hermes 写 prompt 时自查）：
+| 节点 | 最低字符数 |
+|---|---|
+| characterSheet | ≥ 800 字符 |
+| storyboard（整片风格锚）| ≥ 400 字符 |
+| image（每镜头分镜）| ≥ 500 字符 |
+| image2video（每镜头视频）| ≥ 800 字符 |
+
+如果你写完不到这个数字，**重写一遍**，不要建节点。
+
+### ⚠️ 错误做法（hermes 必须避免）
+
 错误做法 ❌
 1. 直接调 API 给用户出图出视频
 2. 节点 prompt 一句话："白衣染尘、隐忍坚毅"——这是描述，不是 prompt
-3. 一个 storyboard 节点出 N 张图就直接接 image2video（B 工作流要求每镜头一个独立 image 节点）
-4. 把镜头/焦距/光线/比例全塞 prompt 字符串里，结构化字段（shotSize / cameraMovement / lighting / colorTone / aspectRatio）留空
-5. 角色不锁脸、不锁服装、不写 negative prompt
-6. 自己 canvas_run_node 跑节点
+3. 用英文短句"cinematic xianxia dying golden light"代替中文详细描述
+4. 一个 storyboard 节点出 N 张图就直接接 image2video（B 工作流要求每镜头一个独立 image 节点）
+5. 把镜头/焦距/光线/比例全塞 prompt 字符串里，结构化字段（shotSize / cameraMovement / lighting / colorTone / aspectRatio）留空
+6. 角色不锁脸、不锁服装、不写 negative prompt
+7. 自己 canvas_run_node 跑节点
 
 正确做法 ✅
 1. **建项目**（带 Phase 1-3 全文）→ **加角色立绘** → **加 scriptGen** → **加 storyboard 当风格锚** → **每镜头加双关键帧 image 节点（首+末）** → **每镜头加 image2video** → **videoConcat 拼接**
-2. **每个节点的 prompt 都是工业级**（≥ 600/800/1000 字符，按节点类型）
+2. **每个节点的 prompt 都是工业级中文**（≥ 800/500/800 字符，按节点类型；含 6 类信息 + Identity Lock + negative）
 3. **结构化字段独立填**：shotSize / cameraMovement / lighting / colorTone / aspectRatio 必须分别传，不要全堆 prompt 里
 4. **角色锁死**：每个角色一个 characterSheet，所有下游节点 connect 到 .views
 5. **negative prompt 必备**：每个图/视频节点都写
