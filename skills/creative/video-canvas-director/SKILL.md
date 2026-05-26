@@ -1573,7 +1573,6 @@ else:
 **Hermes 选 image2video.videoModel 之前必须先调 `canvas_list_video_models()`** 拿真实
 duration / tailFrame / nativeAudio / 4K 限制再决定。常见错误：
 - 选了 `veo3.1-fast` 但传 `duration: 5` → 网关 422（Veo 只接受 8）
-- 选了 `veo3.1-pro-4k` 还想用首尾帧 → tailFrame 字段被忽略，角色漂移
 - 选了 `sora-2-pro` 传 `duration: 10` → API invalid_value（只接 4/8/12）
 
 **速查表**（每个模型的硬限制）：
@@ -1583,8 +1582,8 @@ duration / tailFrame / nativeAudio / 4K 限制再决定。常见错误：
 | **Veo 3.1 Fast** ⭐ | 8 固定 | ✅ | ✅ | 1080p |
 | Veo 3.1 / Pro | 8 固定 | ✅ | ✅ | 1080p |
 | Veo 3.1 Fast 4K | 8 固定 | ✅ | ✅ | **4K** |
-| Veo 3.1 Pro 4K | 8 固定 | ❌ | ✅ | 4K |
-| Veo 3.1 4K | 8 固定 | ❌ | ✅ | 4K |
+| Veo 3.1 Pro 4K | 8 固定 | ✅ | ✅ | 4K |
+| Veo 3.1 4K | 8 固定 | ✅ | ✅ | 4K |
 | Veo 3.1 Components | 8 固定 | ❌ | ✅ | 1080p |
 | Veo 2 / 2 Pro / 2 Fast | 5-8 | ❌ | ❌ | 1080p |
 | **Sora 2 Pro** ⭐ | **4 / 8 / 12 三档** | ❌ | ✅ | 1080p |
@@ -1614,7 +1613,7 @@ duration / tailFrame / nativeAudio / 4K 限制再决定。常见错误：
    或 Seedance 2.0 Pro（15s）
 
 3. 用户要 4K + 双关键帧
-   → Veo 3.1 Fast 4K（注意 Pro 4K / 4K 不支持首尾帧）
+   → Veo 3.1 4K / Veo 3.1 Fast 4K / Veo 3.1 Pro 4K（三个 4K 变体都支持首尾帧）
 
 4. 用户要嘴型同步对白
    → Kling 2.6 Pro（kling-video）
