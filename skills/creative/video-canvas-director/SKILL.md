@@ -1,7 +1,7 @@
 ---
 name: video-canvas-director
 description: "通过 Hermes 桌面端的无限画布做生产级 AI 电影。Hermes 是导演 + 制片厂主任，**搭画布不调 API**——按工作流 B（scriptGen → storyboard 风格锚 → 每镜头独立 image × 2 [首帧 + 末帧] → image2video → videoConcat）搭出可视化 pipeline，让用户看到每个镜头的独立分镜节点（占位 idle，运行后才出图）。基于 2026 年 Veo 3.1 / Sora 2 / Seedance 2.0 / Kling 2.6 工业实战。v7.3 强制 Phase Gates：剧本拆解 → 角色 Bible → 镜头规划 → 用户确认后才搭画布；时长按剧情节奏决定，不是模型上限填满。专业知识（题材模板/音频/双关键帧）按需 skill_view 子文件加载。"
-version: 7.4.0
+version: 8.0.0
 license: MIT
 platforms: [macos, linux, windows]
 metadata:
@@ -10,15 +10,16 @@ metadata:
     requires: [hermes-desktop, desktop-bridge]
 ---
 
-# Video Canvas Director — 生产级 AI 视频画布编排（v7.3 紧凑版）
+# Video Canvas Director — 生产级 AI 视频画布编排（v8.0 LibTV 范式）
 
 When the user asks Hermes to **make a video, short film, music video, ad, multi-episode series, or adapt a novel/screenplay** — invoke this skill.
 
-> **v7.3 关键升级**
-> 1. **重排 + 拆分**：本 SKILL.md 只保留触发流程必需内容（约 600 行 / 25KB），10 大题材模板 / 音频设计 / 双关键帧 / 自检 / 影视级 等参考资料拆到 `references/*.md`，按需 `skill_view` 加载。
-> 2. **强制 Phase Gates**：搭画布前必须 chat 输出 Phase 1 剧本拆解 + Phase 2 角色 Bible + Phase 3 镜头规划，等用户确认才能调 `canvas_*` 工具。`canvas_create_project` 工具签名硬校验，缺一项就 phase_gate_failed 拒绝。
-> 3. **时长由剧情决定**：高潮镜头敢用 12s + 贵模型，过场镜头便宜短模型，必要时用 videoTrim / videoExtend 调整。
-> 4. **双关键帧锁定**（详见 `references/dual-keyframe.md`）：每镜头首帧 + 末帧 image，都连进同一 image2video，角色绝不漂移。
+> **v8.0 关键升级（LibTV 团队版范式对齐）**
+> 1. **角色三视图 / 分镜跑完会自动 spawn N 个独立 image 子节点**（每张图都是画布上的独立节点，可单独 inpaint / 重跑 / 当下游 reference）。不再把 9 张图全塞父节点 outputs。用 `canvas_get_spawned_children(project_id, parent_node_id)` 拿子节点列表，挑 3 张连下游。
+> 2. **跨画布主体库**（人物 / 场景 / 道具 三类）：搭画布前先 `canvas_subject_list` 检索是否有可复用主体；命中就 `canvas_subject_load` + `canvas_op_add_node` 直接落地，不重新生成 → 省时间省积分 + 角色一致性更稳。
+> 3. **音乐驱动卡点**：`image2video` 节点新加 `audioRef` 字段，仅 nativeAudio 模型（Seedance 2.0 / Veo 3.1 / Sora 2 / Wan 2.6 等）识别，模型自动按音乐节奏出卡点视频。
+> 4. **一键自动重排**：`canvas_auto_layout(project_id)` 等同用户按 Shift+Option+F；画布超 15 节点或 spawn 后凌乱时主动调用。
+> 5. v7.4 的 Phase Gates / 中文 prompt 强制 / 6 段结构 / 工业级范例 / 时长由剧情决定 / 双关键帧锁定 **全部保留**。
 
 ---
 
@@ -286,9 +287,58 @@ Phase 1-3 输出完后，hermes **必须**说：
 | `canvas_save_artifact(...)` | 落盘到 vault |
 | `canvas_list_artifacts(project?)` | 列出已存产物 |
 
+### 🆕 v8 — Spawn 子节点 / 主体库 / 一键重排（LibTV 范式）
+| 工具 | 何时用 |
+|---|---|
+| `canvas_get_spawned_children(project_id, parent_node_id)` | **必用**：跑完 characterSheet/storyboard 后拿子节点列表（含 childNodeId / spawnLabel / imageUrl） |
+| `canvas_clean_old_spawn_batches(project_id, parent_node_id)` | 父节点重跑后画布乱了，清非最新批次 |
+| `canvas_auto_layout(project_id)` | 画布超 15 节点 / spawn 后凌乱，一键重排（同 Shift+Option+F）|
+| `canvas_subject_list(type_filter?)` | **搭画布前先调**，检索 character/scene/prop 主体看是否可复用 |
+| `canvas_subject_load(subject_id)` | 拿主体完整数据（含 9 视图 url）落地 |
+| `canvas_subject_save(name, subject_type, cover_image_url, views, ...)` | 把当前画布上做出的角色/场景/道具存成跨画布资产 |
+| `canvas_subject_delete(subject_id)` | 清主体 |
+
 ---
 
-## 🏗️ 工作流 B 架构图
+## 🆕 v8 — LibTV 范式：spawn + 主体库工作流图
+
+```
+开工 → canvas_subject_list("character")  ← 先查有无可复用主体
+                ↓ 命中
+                canvas_subject_load(subj_xxx)
+                canvas_op_add_node(kind="characterSheet", data={status:done, outputs:{views:[...]}})
+                                          ↓ 跳过 character generation
+                                          ↓
+                                  characterSheet（已 done，已带 N 视图）
+                                          ↓ 自动 spawn 9 个独立 image 子节点
+                                          ↓
+                ↓ 没命中
+                canvas_op_add_node(kind="characterSheet", data={status:idle, ...})
+                canvas_run_node(project_id, char_id, "downstream")
+                                          ↓ 跑完自动 spawn N 个独立 image 子节点
+                                          ↓
+                                  ★ canvas_get_spawned_children(project_id, char_id)
+                                  ★ 拿到 [{childNodeId, spawnLabel, imageUrl}]
+                                          ↓
+                                  ★ 你挑 3 张最佳的 child id
+                                          ↓
+                                  canvas_subject_save(name, "character", cover, views=挑的3-9张)
+                                  ★ 这样下个画布能复用！
+
+storyboard 同理：跑完自动 spawn N 个分镜独立 image 节点；
+canvas_get_spawned_children 拿子节点 → 逐个连到 image2video 做视频
+```
+
+### 关键约束（v8）
+
+- **不要**自己手动 add_node 创建 image 节点去引用 characterSheet 的 view —— 它们已经被 auto-spawn 了，重复创建会污染画布
+- **每跑完一个 characterSheet / storyboard，必调 `canvas_get_spawned_children` 一次**，拿子节点 id 后才能精准连下游
+- 画布超 15 节点 / spawn 后凌乱，**主动调** `canvas_auto_layout` —— 用户体验更好
+- 搭画布**第一步**应该是 `canvas_subject_list("character")` 检索可复用主体，命中复用比新生成强得多
+
+---
+
+## 🏗️ 工作流 B 架构图（v8）
 
 ```
 ┌────────────────┐
@@ -584,13 +634,18 @@ for i, shot in enumerate(SHOTS):
 ### Step 8 — 每镜头 image2video（接首帧 + 末帧）
 ```python
 for i, shot in enumerate(SHOTS):
-    canvas_add_node(kind="image2video", data_json={
+    image2video_data = {
       "label": f"视频镜头 {i+1}（{shot['duration']}s, 双关键帧）",
       "prompt": "<≥800 字符 — 七要素 + 时间戳分段 + 三层 audio design + negative>",
       "videoModel": shot["model"],   # 从 §模型速查表 选
       "duration": shot["duration"],
-      "aspectRatio": "16:9"
-    }) → vid_id
+      "aspectRatio": "16:9",
+    }
+    # 🆕 v8 — 音乐驱动卡点：MV / 卡点视频 / 节奏强相关镜头
+    # 仅 nativeAudio 模型识别（Seedance 2.0 / Veo 3.1 / Sora 2 / Wan 2.6 等）
+    if shot.get("audio_ref_url") and is_native_audio_model(shot["model"]):
+        image2video_data["audioRef"] = shot["audio_ref_url"]
+    canvas_add_node(kind="image2video", data_json=image2video_data) → vid_id
     canvas_connect(project_id, start_id, "images", vid_id, "image")
     canvas_connect(project_id, tail_id, "images", vid_id, "tailFrame")
 ```
@@ -612,8 +667,29 @@ for vid_id in video_node_ids:
     canvas_connect(project_id, vid_id, "videoUrl", concat_id, "videos_multi")
 ```
 
-### Step 11 — 告诉用户（**不要自己 run**）
-告诉用户：画布搭好；推荐运行顺序：① 角色立绘 → ② 风格锚 → ③ 每镜头首末帧 image → ④ 每镜头视频 → ⑤ 拼接。
+### Step 11 — 🆕 v8 画布整理 + 主体归档
+```python
+# 节点超 15 个时主动重排（用户体验）
+canvas_auto_layout(project_id)
+
+# 跑完 characterSheet 后，挑 3 张最佳归档为主体（下次复用）
+children = canvas_get_spawned_children(project_id, char_node_id)
+best_3 = pick_best_views(children["children"])  # hermes 自己挑
+canvas_subject_save(
+    name="<主角名>",
+    subject_type="character",
+    cover_image_url=best_3[0]["imageUrl"],
+    views=[{"label": c["spawnLabel"], "url": c["imageUrl"]} for c in best_3],
+    description="<角色 Bible 简版>",
+    image_model=character_image_model,
+    tags=["<题材>", "<风格>"],
+    source_project_id=project_id,
+    source_node_id=char_node_id,
+)
+```
+
+### Step 12 — 告诉用户（**不要自己 run**）
+告诉用户：画布搭好；推荐运行顺序：① 角色立绘（跑完会自动 spawn 9 张独立子节点，可挑选 / 局部修改）→ ② 风格锚 → ③ 每镜头首末帧 image → ④ 每镜头视频 → ⑤ 拼接。如果之前已经存过该角色为主体，跳过 ①。
 
 ---
 
