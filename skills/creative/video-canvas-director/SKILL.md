@@ -333,6 +333,7 @@ canvas_get_spawned_children 拿子节点 → 逐个连到 image2video 做视频
 
 - **不要**自己手动 add_node 创建 image 节点去引用 characterSheet 的 view —— 它们已经被 auto-spawn 了，重复创建会污染画布
 - **每跑完一个 characterSheet / storyboard，必调 `canvas_get_spawned_children` 一次**，拿子节点 id 后才能精准连下游
+- 如果 `canvas_get_spawned_children` 返回 `children: []`（说明 spawn 失败 fallback 到 v7 旧行为），降级用父节点的 `outputs.views[]` / `outputs.boards[]`
 - 画布超 15 节点 / spawn 后凌乱，**主动调** `canvas_auto_layout` —— 用户体验更好
 - 搭画布**第一步**应该是 `canvas_subject_list("character")` 检索可复用主体，命中复用比新生成强得多
 
