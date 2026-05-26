@@ -1192,6 +1192,23 @@ if node["data"]["status"] == "done" and node["data"]["outputs"].get("images"):
 
 **MUST OUTPUT BEFORE ANY canvas_ tool call**：
 
+⚠️ **每个镜头必须用 §镜头字段词典 里的标准词**，**不能**写"中景一点"、"一个特写"
+这种笼统话——必须写 `medium` / `medium-close` / `close-up` 这种 SKILL 已经定义的词。
+如果不照这个填，下游 image2video 节点的结构化字段对应不上模型可识别的关键词，
+角色 + 镜头会漂移。
+
+**强制使用以下专业字段（每个值都从 §镜头字段词典 选）**：
+
+| 字段 | 必须从这些值里选 |
+|---|---|
+| 景别 (shotSize) | extreme-wide / wide / medium-wide / medium / medium-close / close-up / extreme-close / over-the-shoulder |
+| 角度 (cameraAngle) | eye-level / low / high / dutch / worms-eye / birds-eye / over-shoulder / pov |
+| 运镜 (cameraMovement) | static / dolly-in / dolly-out / tracking / pan-left / pan-right / tilt-up / tilt-down / orbit / crane-up / crane-down / handheld / steadicam-push |
+| 光线 (lighting) | golden-hour / blue-hour / low-key / high-key / rembrandt / backlit / hard-noon / overcast / neon-night / candle-light / moonlight / volumetric / god-rays / magical (魔法系) |
+| 焦距 (lens) | 14mm / 24mm / 35mm / 50mm / 85mm / 100mm-macro / 135mm / 200mm-tele / 24-70mm / anamorphic |
+| 节奏 (pacing) | 慢 (3-5s) / 中 (5-8s) / 快 (1.5-3s) / 极快 (≤1s) / 燃爆 / 渐弱 |
+| 色调 (colorTone) | 题材 preset 自由组合，例 "teal-amber"、"warm rim + jade shadow"、"crimson + jade"、"epic gold-cyan" |
+
 输出一个**镜头表**（不是节点表，节点之后才建）。每镜头一行：
 
 ```
@@ -1219,10 +1236,16 @@ if node["data"]["status"] == "done" and node["data"]["outputs"].get("images"):
 
 【模型选择推理】
 - 单镜头 ≤ 8s 的（1, 5, 6, 8）：用 veo3.1-fast（首尾帧 + 音频，$0.17/s）
-- 单镜头 = 10s 的（4）：用 hailuo-02 或 kling-video（5/10 双档）
+- 单镜头 = 10s 的（4）：用 hailuo-02（6/10 档）或 kling-video（5/10/15）
 - 单镜头 = 12s 的（7）：用 sora-2-pro（4/8/12 三档，$0.58/s，但是高潮值得）
   或 viduq3-pro（1-16s 任意，$0.12/s，性价比更高）
-- 镜头 3 (5s) → seedance-2-0-pro（4-15s 灵活，$0.07/s）
+- 镜头 3 (5s) → doubao-seedance-2-0-260128（任意秒数 + 多模态，$0.07/s）
+
+【时长不匹配的处理】（按 §"时长 ≠ 模型上限" 章节规则）
+- 镜头 5 (8s) 用 veo3.1-fast 正好 8s，不用任何后期
+- 假设镜头 3 用 veo3.1-fast（固定 8s）但只要 5s → 加 videoTrim 节点（startSec=1.5, endSec=6.5）
+- 假设镜头 7 (12s) 想用 kling-video → 出 10s（kling 上限）+ 加 videoExtend 节点续 2s
+  （注意：videoExtend 仅 kling-* 模型可用，因为接口要 video_id）
 
 【预算估算】
 60s 总时长 × 混合模型平均 ≈ $0.25/s × 60 = ~$15 + 16 张分镜图 ≈ $2 = 总 $17
@@ -1233,6 +1256,8 @@ if node["data"]["status"] == "done" and node["data"]["outputs"].get("images"):
 - 高潮镜头要敢用长（12s）+ 贵的模型（sora 2 pro / vidu q3 pro）
 - 过场镜头要用便宜短的（seedance / hailuo / veo fast）
 - 同一片子可以混用 3-5 个不同模型
+- **每个镜头的"景别 / 角度 / 运镜 / 光线 / 焦距"必须从 §镜头字段词典 选标准词**，
+  不能写笼统话（"中景一点 / 一个特写"会让结构化字段无法生效）
 
 ---
 
