@@ -1624,18 +1624,18 @@ duration / tailFrame / nativeAudio / 4K 限制再决定。常见错误：
 
 ---
 
-### ⏱️ 时长 ≠ 模型上限：剧情节奏决定，必要时用剪辑节点
+### ⏱️ 时长 ≠ 模型上限：剧情节奏决定，必要时用剪辑/续接节点
 
-很多模型时长是**固定的**（Veo 3.1 全系 8s，Sora 2 三档，Wan 5s）。当 Phase 3 镜头表
-要求一个 5 秒、3 秒或 11 秒的镜头时：
+很多模型时长是**固定的**（Veo 3.1 全系 8s，Sora 2 三档 4/8/12，Wan 5s）。当 Phase 3 镜头表
+要求 5 秒、3 秒或 11 秒的镜头时，按以下顺序选择策略：
 
-#### 选项 A：选时长灵活的模型
+#### 选项 A：选时长灵活的模型（首选 ★）
 - 任意时长（4-15）：`doubao-seedance-2-0-260128` / `viduq3-pro` / `viduq3-turbo`
 - 6 / 10：`MiniMax-Hailuo-02`
 - 4 / 8 / 12：`sora-2-pro`
 
-#### 选项 B：用 videoConcat 的 segmentTrims 后期裁剪
-当一定要用 Veo 3.1 Fast（固定 8s）但镜头只要 5 秒：
+#### 选项 B：videoTrim 节点 — 后期裁剪
+当一定要用 Veo 3.1 Fast（固定 8s）但镜头表只要 5 秒时，加一个 **videoTrim** 节点裁掉首尾废镜头：
 
 ```python
 # 1. image2video 出 8 秒
@@ -1643,29 +1643,68 @@ canvas_add_node(kind="image2video", data_json={
     "videoModel": "veo3.1-fast",
     "duration": 8,
     "prompt": "...8秒完整镜头描述..."
-}) → vid_id_1
+}) → vid_8s
 
-# 2. videoConcat 通过 segmentTrims 裁掉前后浪费的部分
+# 2. videoTrim 节点裁掉前 1.5s 留中间 5s 精华
+canvas_add_node(kind="videoTrim", data_json={
+    "label": "镜头 N — 裁剪到 5s",
+    "startSec": 1.5,
+    "endSec": 6.5,
+    "reencode": True
+}) → trim_id
+
+# 3. 连接：image2video.videoUrl → videoTrim.video → videoConcat.videos_multi
+canvas_connect(project_id, vid_8s, "videoUrl", trim_id, "video")
+canvas_connect(project_id, trim_id, "videoUrl", concat_id, "videos_multi")
+```
+
+#### 选项 B'：videoConcat 内置 segmentTrims（一站式）
+如果只在最终拼接时统一裁剪，不需要 videoTrim 节点，可以用 videoConcat 的
+`segmentTrims` 字段一次配置所有段：
+
+```python
 canvas_add_node(kind="videoConcat", data_json={
-    "videoOrder": [vid_id_1, vid_id_2, ...],
+    "videoOrder": [vid_8s_a, vid_8s_b, vid_8s_c],
     "segmentTrims": {
-        # 保留 1.5s ~ 6.5s 这 5 秒
-        "<vid_id_1>": {"startSec": 1.5, "endSec": 6.5},
-        # 第二段保留前 4.2 秒
-        "<vid_id_2>": {"startSec": 0, "endSec": 4.2},
+        vid_8s_a: {"startSec": 1.5, "endSec": 6.5},  # 第 a 段保留 5s
+        vid_8s_b: {"startSec": 0,   "endSec": 4.2},  # 第 b 段保留前 4.2s
     },
     "crossfadeSeconds": 0.4
 })
 ```
 
-ffmpeg 会先按 segmentTrims 裁剪每段，再 concat。这样**镜头时长完全由剧情决定，
-不被模型上限绑架**。
+> **何时用 videoTrim 节点 vs segmentTrims**：
+> - 只是让最终成片时长精确 → 用 `segmentTrims`（少一层节点）
+> - 中间产物要送给 videoExtend / subtitleRemoval 等下游节点 → 必须用 videoTrim
+>   节点（segmentTrims 只在 concat 内部生效，不输出可继续连线的视频）
 
-#### 选项 C：用 kling-video-extend 续接
-当模型只能出 8s 但要 13s 镜头：先 image2video 出 8s，再加 kling-video-extend
-节点续 5s。注意：续接出来的部分角色一致性会下降，慎用。
+#### 选项 C：videoExtend 节点 — 续接（≥ 模型上限时）
+当镜头要 13 秒但模型只能出 8 秒，先 image2video 出 8s，然后加 videoExtend 续 5s：
 
-**推荐排序**：A > B > C。优先选时长灵活的模型；不行就 segmentTrims；最后才是 extend。
+```python
+canvas_add_node(kind="image2video", data_json={
+    "videoModel": "veo3.1-fast",
+    "duration": 8,
+    "prompt": "..."
+}) → vid_8s
+
+canvas_add_node(kind="videoExtend", data_json={
+    "label": "镜头 N — 续接 +5s",
+    "extendSeconds": 5,
+    "videoModel": "kling-video-extend",
+    "prompt": "继续上一秒的动作，平滑过渡"
+}) → ext_id
+
+canvas_connect(project_id, vid_8s, "videoUrl", ext_id, "video")
+canvas_connect(project_id, ext_id, "videoUrl", concat_id, "videos_multi")
+```
+
+⚠️ **续接段角色一致性会下降**，慎用；优先选时长灵活的模型（选项 A）。
+
+**推荐排序**：A > B > B' > C。
+1. 首选**时长灵活的模型**避免任何后期处理。
+2. 其次用 **videoTrim** 节点（中间产物可继续编辑）或 **segmentTrims** 字段（一站式拼接）。
+3. 最后才是 **videoExtend**（仅当时长 > 模型上限）。
 
 ---
 
