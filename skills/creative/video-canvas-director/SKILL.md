@@ -20,6 +20,40 @@ When the user asks Hermes to **make a video, short film, music video, ad, multi-
 > 3. **多模型混用**：60s 成片可同时用 veo3.1-fast / sora-2-pro / seedance / vidu-q3，按镜头需求选
 > 4. **双关键帧锁定**：每镜头首帧 + 末帧 image，都连进同一 image2video，角色绝不漂移
 
+---
+
+## ⛔ HARD GATE — 不读完这一节就不要建项目
+
+**`canvas_create_project` 已加了运行时校验**：缺少 `story_beats / character_bible / shot_breakdown / user_confirmed=True` 任意一项就会**直接返回 phase_gate_failed**，画布不会建。
+
+所以工作流是固定的：
+
+```
+USER: 给你一段剧本，搭画布
+HERMES → chat 输出 Phase 1（剧本拆解，≥120 字）
+HERMES → chat 输出 Phase 2（角色 Bible，每角色 ≥200 字）
+HERMES → chat 输出 Phase 3（镜头规划表，≥200 字含每镜头时长 + 字段）
+HERMES → 问「以上确认无误我开始搭画布？」
+USER  → 确认（或微调，循环回到对应 phase）
+HERMES → canvas_create_project(
+           name="...",
+           story_beats="<Phase 1 全文>",
+           character_bible="<Phase 2 全文>",
+           shot_breakdown="<Phase 3 全文>",
+           user_confirmed=True
+         )
+HERMES → 后续 canvas_add_node / canvas_connect ...
+```
+
+**禁止**：
+- 跳过 Phase 1/2/3 直接调 `canvas_create_project` → 工具拒绝
+- 给 Phase 1/2/3 一个空字符串或几十字应付 → 工具拒绝（≥120/200/200 字硬阈值）
+- 没等用户回复就 `user_confirmed=True` → 流程作弊；只能在用户明确说"确认 / 搭吧 / 继续 / yes / OK"等之后才设 True
+
+**Phase 1-3 的输出格式 + 内容深度**详见下方 §强制 Phase Gates 章节，必须按那个模板出。
+
+---
+
 ## 🔥 核心理念（必读，违反就是故障）
 
 > **Hermes 的工作 = 搭画布 + 写工业级 prompt + 填结构化字段。不直接出图出视频。**
@@ -1228,10 +1262,19 @@ Phase 1-3 输出完后，hermes **必须**说一句类似：
 canvas_segment_script(raw)  → episodes / global_characters / global_style
 ```
 
-### Step 3 — 建项目
+### Step 3 — 建项目（必须传 Phase 1-3 全文 + user_confirmed）
 ```
-canvas_create_project(name="<项目名>")
+canvas_create_project(
+  name="<项目名>",
+  story_beats="<Phase 1 输出，≥120 字>",
+  character_bible="<Phase 2 输出，≥200 字>",
+  shot_breakdown="<Phase 3 输出，≥200 字>",
+  user_confirmed=True   # 用户在 chat 中确认后才能传 True
+)
 → 拿到 projectId（保存）
+
+# 缺少任一字段或 user_confirmed=False → 工具直接返回 phase_gate_failed，
+# 必须先回到 chat 补足 Phase 1-3 + 等用户确认，再重试。
 ```
 
 ### Step 4 — 加角色立绘（每出场角色一个）
@@ -1626,7 +1669,13 @@ canvas_add_node(kind="image2video", data_json=json.dumps({
 **Hermes 的 MCP 工具调用路径**：
 
 ```
-1. canvas_create_project(name="少年剑仙渡劫·神龙伴身")
+1. canvas_create_project(
+     name="少年剑仙渡劫·神龙伴身",
+     story_beats="<Phase 1 全文（已在 chat 输出）>",
+     character_bible="<Phase 2 全文（已在 chat 输出）>",
+     shot_breakdown="<Phase 3 全文（已在 chat 输出）>",
+     user_confirmed=True   # 用户已在 chat 中确认
+   )
    → projectId
 
 2. canvas_add_node(kind="characterSheet", label="白衣剑仙", description=<800字符锁定>, imageModel="gpt-image-2-all", viewCount=9)
