@@ -1575,31 +1575,99 @@ duration / tailFrame / nativeAudio / 4K 限制再决定。常见错误：
 - 选了 `veo3.1-fast` 但传 `duration: 5` → 网关 422（Veo 只接受 8）
 - 选了 `sora-2-pro` 传 `duration: 10` → API invalid_value（只接 4/8/12）
 
-**速查表**（每个模型的硬限制）：
+**速查表**（数据 100% 来自诗云 https://shiyunapi.com/api/pricing_new + apifox 视频接口文档）：
 
-| 模型 | duration（秒） | 首尾帧 | 原生音频 | 最高分辨率 |
+| 模型 ID（诗云原 model_name）| duration（秒）| 首尾帧 | 原生音频 | 最高分辨率 |
 |---|---|---|---|---|
-| **Veo 3.1 Fast** ⭐ | 8 固定 | ✅ | ✅ | 1080p |
-| Veo 3.1 / Pro | 8 固定 | ✅ | ✅ | 1080p |
-| Veo 3.1 Fast 4K | 8 固定 | ✅ | ✅ | **4K** |
-| Veo 3.1 Pro 4K | 8 固定 | ✅ | ✅ | 4K |
-| Veo 3.1 4K | 8 固定 | ✅ | ✅ | 4K |
-| Veo 3.1 Components | 8 固定 | ❌ | ✅ | 1080p |
-| Veo 2 / 2 Pro / 2 Fast | 5-8 | ❌ | ❌ | 1080p |
-| **Sora 2 Pro** ⭐ | **4 / 8 / 12 三档** | ❌ | ✅ | 1080p |
-| Sora 2 | 4 / 8 / 12 | ❌ | ✅ | 720p |
-| **Seedance 2.0 Pro** ⭐ | **4-15 任意** | ✅ | ✅ | 1080p |
-| Seedance 1.0 Pro | 5-15 | ✅ | ❌ | 1080p |
-| Seedance 1.0 Lite | 5-10 | ❌ | ❌ | 720p |
-| **Hailuo 02** ⭐ | **6 / 10** | ✅ | ❌ | 1080p |
-| Hailuo 2.3 | 6 / 10 | ✅ | ❌ | 1080p |
-| **Kling Video (2.6 Pro)** ⭐ | **5 / 10** | ✅ | ✅ + 嘴型同步 | 1080p |
-| Kling Avatar | 跟音频 | ❌ | （音频驱动）| - |
-| Wan 2.6 I2V | 5 固定 | ✅ | ❌ | 1080p |
-| **Vidu Q3 Pro** ⭐ | **1-16 任意** | ✅ | ✅ | 1080p |
-| Vidu Q3 / Q3 Turbo / Q3 Mix | 1-16 任意 | ✅ | ✅ | 1080p |
-| Vidu Q2 / Q2 Pro | 5 / 8 | ✅ | ❌ | 1080p |
-| Grok Video 3 (10s) | 10 固定 | ❌ | ❌ | 1080p |
+| **doubao-seedance-2-0-260128** ⭐ | **4-15 任意** | ✅ | ✅ | 1080p |
+| **veo3.1-fast** ⭐ | 8 固定 | ✅ | ✅ | 1080p |
+| **veo_3_1-fast-4K** ⭐ | 8 固定 | ✅ | ✅ | **4K** |
+| veo3.1 / veo_3_1 | 8 固定 | ✅ | ✅ | 1080p |
+| veo3.1-pro / veo_3_1-pro | 8 固定 | ✅ | ✅ | 1080p |
+| veo3.1-pro-4k | 8 固定 | ✅ | ✅ | 4K |
+| veo3.1-4k / veo_3_1-4K | 8 固定 | ✅ | ✅ | 4K |
+| veo3.1-components | 8 固定 | ❌（仅首帧）| ✅ | 1080p |
+| veo3.1-components-4k | 8 固定 | ❌（仅首帧）| ✅ | 4K |
+| veo_3_1-fast-components-4K | 8 固定 | ❌（仅首帧）| ❌ | 4K |
+| **sora-2-pro** ⭐ | **4 / 8 / 12 三档** | ❌ | ✅ | 1080p |
+| sora-2 | 4 / 8 / 12 | ❌ | ✅ | 720p |
+| **doubao-seedance-1-5-pro-251215** ⭐ | **任意（4-12，--dur 控制）** | ✅ | ✅ | 1080p |
+| doubao-seedance-1-0-pro-250528 | 5-15 | ✅ | ❌ | 1080p |
+| doubao-seedance-1-0-pro-fast-251015 | 5-15 | ❌（仅首帧）| ❌ | 1080p |
+| doubao-seedance-1-0-lite-i2v-250428 | 5-10 | ✅ | ❌ | 1080p |
+| doubao-seedance-1-0-lite-t2v-250428 | 5-10 | ❌ | ❌ | 1080p |
+| **MiniMax-Hailuo-02** ⭐ | **6 / 10** | ✅ | ❌ | 1080p |
+| MiniMax-Hailuo-2.3 | 6 / 10 | ✅ | ❌ | 1080p |
+| **kling-video** ⭐ | **5 / 10 / 15** | ❌ | ✅（部分版本）| 1080p |
+| kling-omni-video (O1) | 5 / 10 | ❌ | ❌ | 1080p |
+| kling-avatar-image2video | 跟音频 | ❌ | ❌ | - |
+| kling-motion-control | 最长 30s | ❌ | ❌ | - |
+| kling-video-extend | 续接 5s | ❌ | ❌ | - |
+| wan2.6-i2v | 5 固定 | ❌（仅首帧）| ✅ | 1080p |
+| wan2.5-i2v-preview | 5 固定 | ❌（仅首帧）| ❌ | 1080p |
+| **viduq3-pro** ⭐ | **4-16 任意** | ✅ | ✅ | 1080p |
+| viduq3-turbo | 4-16 任意 | ✅ | ✅ | 1080p |
+| viduq3 | 4-8 | ❌ | ❌ | 1080p |
+| viduq3-mix | 4-8 | ❌ | ❌ | 1080p |
+| viduq2-pro / viduq2-turbo | 4-8 | ✅ | ❌ | 1080p |
+| viduq2 | 4-8 | ❌ | ❌ | 1080p |
+| viduq1 / viduq1-classic | 4-8 | ✅ | ❌ | 1080p |
+| vidu2.0 | 4-8 | ✅ | ❌ | 1080p |
+| omni-flash-components | 6 / 8 / 10 | ❌ | ✅ | 1080p |
+| grok-video-3 | 6 固定 | ❌ | ❌ | 1080p |
+| grok-video-3-10s | 10 固定 | ❌ | ✅ | 1080p |
+| happyhorse-1.0-i2v / t2v / r2v / video-edit | - | ❌ | ❌ | - |
+
+> **数据校对脚本**：`hermes-source/desktop_bridge_mcp.py.canvas_list_video_models` 在运行时
+> 从 `https://shiyunapi.com/api/pricing_new` 拉真实 tags + 描述，hermes 必须先调这个工具
+> 才决定 videoModel。**不要凭记忆选模型**——能力会动态变化。
+
+---
+
+### ⏱️ 时长 ≠ 模型上限：剧情节奏决定，必要时用剪辑节点
+
+很多模型时长是**固定的**（Veo 3.1 全系 8s，Sora 2 三档，Wan 5s）。当 Phase 3 镜头表
+要求一个 5 秒、3 秒或 11 秒的镜头时：
+
+#### 选项 A：选时长灵活的模型
+- 任意时长（4-15）：`doubao-seedance-2-0-260128` / `viduq3-pro` / `viduq3-turbo`
+- 6 / 10：`MiniMax-Hailuo-02`
+- 4 / 8 / 12：`sora-2-pro`
+
+#### 选项 B：用 videoConcat 的 segmentTrims 后期裁剪
+当一定要用 Veo 3.1 Fast（固定 8s）但镜头只要 5 秒：
+
+```python
+# 1. image2video 出 8 秒
+canvas_add_node(kind="image2video", data_json={
+    "videoModel": "veo3.1-fast",
+    "duration": 8,
+    "prompt": "...8秒完整镜头描述..."
+}) → vid_id_1
+
+# 2. videoConcat 通过 segmentTrims 裁掉前后浪费的部分
+canvas_add_node(kind="videoConcat", data_json={
+    "videoOrder": [vid_id_1, vid_id_2, ...],
+    "segmentTrims": {
+        # 保留 1.5s ~ 6.5s 这 5 秒
+        "<vid_id_1>": {"startSec": 1.5, "endSec": 6.5},
+        # 第二段保留前 4.2 秒
+        "<vid_id_2>": {"startSec": 0, "endSec": 4.2},
+    },
+    "crossfadeSeconds": 0.4
+})
+```
+
+ffmpeg 会先按 segmentTrims 裁剪每段，再 concat。这样**镜头时长完全由剧情决定，
+不被模型上限绑架**。
+
+#### 选项 C：用 kling-video-extend 续接
+当模型只能出 8s 但要 13s 镜头：先 image2video 出 8s，再加 kling-video-extend
+节点续 5s。注意：续接出来的部分角色一致性会下降，慎用。
+
+**推荐排序**：A > B > C。优先选时长灵活的模型；不行就 segmentTrims；最后才是 extend。
+
+---
 
 **决策路径**：
 
