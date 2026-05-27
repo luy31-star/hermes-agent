@@ -1,7 +1,7 @@
 ---
 name: video-canvas-director
 description: "通过 Hermes 桌面端的无限画布做生产级 AI 电影。Hermes 是导演 + 制片厂主任，**搭画布不调 API**——按工作流 B（scriptGen → storyboard 风格锚 → 每镜头独立 image × 2 [首帧 + 末帧] → image2video → videoConcat）搭出可视化 pipeline，让用户看到每个镜头的独立分镜节点（占位 idle，运行后才出图）。基于 2026 年 Veo 3.1 / Sora 2 / Seedance 2.0 / Kling 2.6 工业实战。v7.3 强制 Phase Gates：剧本拆解 → 角色 Bible → 镜头规划 → 用户确认后才搭画布；时长按剧情节奏决定，不是模型上限填满。专业知识（题材模板/音频/双关键帧）按需 skill_view 子文件加载。"
-version: 10.0.0
+version: 11.0.0
 license: MIT
 platforms: [macos, linux, windows]
 metadata:
@@ -10,17 +10,14 @@ metadata:
     requires: [hermes-desktop, desktop-bridge]
 ---
 
-# Video Canvas Director — 生产级 AI 视频画布编排（v10.0 编导级专业能力）
+# Video Canvas Director — 生产级 AI 视频画布编排（v11.0 剧本医生 + 音乐生成）
 
 When the user asks Hermes to **make a video, short film, music video, ad, multi-episode series, or adapt a novel/screenplay** — invoke this skill.
 
-> **v10.0 关键升级（编导专业能力）**
-> 1. **shotSet 节点（镜头组）**：基于一张主参考图 + 角色多视图，输出 master / reverse / closeup / OTS 一组镜头，**严守 180° 轴线**，解决场景空间一致性。
-> 2. **dialogueShot 节点（对话场景 8 镜头）**：双角色对话标准 8 件套（建立 / 双人 / OTS×2 / 特写×2 / 反应×2），A 永远屏幕左 B 永远屏幕右，杜绝跨轴。
-> 3. **videoConcat cutPattern**：standard / rapid-cut（快剪紧张感）/ j-cut / l-cut / montage（蒙太奇）。
-> 4. **项目级 lookProfile**：色温/主色调/对比度/影调/颗粒，自动注入所有节点 prompt 末尾，整片色彩统一。
-> 5. **项目级 audioBible**：主题音乐/主角主题/环境声/Foley，注入 image2video prompt，整片声音设计统一。
-> 6. v9 的 magic toolbar / 多画布 / 表格视图 / text 节点 全部保留。
+> **v11.0 关键升级**
+> 1. **剧本医生（`canvas_run_script_doctor`）**：scriptGen 跑完后调，调 vision 模型按 6 维评分（钩子 / 角色弧 / 节奏 / 对白 / 视觉化 / 情感张力），输出整体评级 + 具体改进建议（critical/high/medium/low）+ 可选 AI 修订版 scenes。
+> 2. **音乐 / 音效节点（`musicGen`）**：用诗云 vidu audio1.0 / kling-audio 文生音效，单段 BGM（10s 内）或卡点分段时间戳。输出 audioUrl，可接 image2video.audioRef / videoConcat.bgmUrl / audio2video.audio。
+> 3. v10 的 shotSet / dialogueShot / cutPattern / 项目编导档案 全部保留。
 
 ---
 
@@ -326,6 +323,12 @@ Phase 1-3 输出完后，hermes **必须**说：
 | `canvas_save_director_bible(project_id, look_profile, audio_bible)` | 保存项目级色彩+声音档案，自动注入所有节点 prompt |
 | `canvas_load_director_bible(project_id)` | 读项目档案 |
 
+### 🆕 v11 — 剧本医生 + 音乐生成
+| 工具 / 节点 | 用途 |
+|---|---|
+| `canvas_run_script_doctor(scenes, user_intent?)` | scriptGen 跑完后调，按 6 维评分 + 改进建议（critical/high/medium/low）+ 可选 AI 修订版 |
+| `kind="musicGen"` | 文生音效 / BGM（vidu audio1.0 / kling-audio）；单段或卡点分段 |
+
 ---
 
 ## 🆕 v9 — image 魔法工具栏工作流
@@ -488,6 +491,62 @@ canvas_save_director_bible(
 ```
 
 整片色调 + 声音设计自动统一，hermes 不用每个节点重复写。
+
+---
+
+## 🆕 v11 — 剧本医生（Script Doctor）
+
+scriptGen 跑完后**强烈推荐**调一次剧本医生：
+
+```python
+report = canvas_run_script_doctor(
+  scenes=scriptGen.outputs.scenes,
+  user_intent="<story_beats 概要>"
+)
+# report.grade ∈ A+/A/B+/B/C+/C/D
+# report.scores: 6 维评分（0-10）
+# report.improvements: critical/high/medium/low 改进建议
+# report.revisedScenes: 可选 AI 修订版（接受就用 update_node_data 写回）
+```
+
+**6 维度**：hook（钩子）/ characterArc（角色弧）/ pacing（节奏）/ dialogue（对白）/ visualizability（视觉化）/ emotionalImpact（情感张力）
+
+**门槛**：B+ 以上直接搭画布；C 以下接受修订或回 Phase 1 重写；critical 改进必须处理。
+
+---
+
+## 🆕 v11 — 音乐 / 音效（musicGen）
+
+诗云接的 vidu audio1.0 / kling-audio，duration 2-10 秒：
+
+### 单段 BGM
+```python
+canvas_op_add_node(kind="musicGen", data_json={
+  "prompt": "古风弦乐 + 笛箫，悲悯隐忍；雨夜环境氛围",
+  "duration": 10,
+  "audioModel": "audio1.0"
+})
+# audioUrl → videoConcat.bgmUrl
+```
+
+### 卡点分段（每段独立 prompt）
+```python
+canvas_op_add_node(kind="musicGen", data_json={
+  "duration": 10,
+  "audioModel": "audio1.0",
+  "timingPrompts": [
+    {"from": 0, "to": 3, "prompt": "鸟鸣晨光，笛声渐起"},
+    {"from": 3, "to": 6, "prompt": "雨声渐起，弦乐转沉"},
+    {"from": 5, "to": 9.5, "prompt": "钟鼓齐鸣，高潮"}
+  ]
+})
+```
+
+**接入位置**：
+- 整片 BGM → videoConcat.bgmUrl
+- 单镜卡点 → image2video.audioRef（仅 nativeAudio 模型识别）
+
+⚠️ duration ≤ 10s；超过分多段 musicGen + 后期拼接。
 
 ---
 
