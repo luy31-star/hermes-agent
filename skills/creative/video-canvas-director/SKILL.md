@@ -1,7 +1,7 @@
 ---
 name: video-canvas-director
 description: "通过 Hermes 桌面端的无限画布做生产级 AI 电影。Hermes 是导演 + 制片厂主任，**搭画布不调 API**——按工作流 B（scriptGen → storyboard 风格锚 → 每镜头独立 image × 2 [首帧 + 末帧] → image2video → videoConcat）搭出可视化 pipeline，让用户看到每个镜头的独立分镜节点（占位 idle，运行后才出图）。基于 2026 年 Veo 3.1 / Sora 2 / Seedance 2.0 / Kling 2.6 工业实战。v7.3 强制 Phase Gates：剧本拆解 → 角色 Bible → 镜头规划 → 用户确认后才搭画布；时长按剧情节奏决定，不是模型上限填满。v12 加动作戏 8 大武术机位（actionShotSet）。专业知识（题材模板/音频/双关键帧）按需 skill_view 子文件加载。"
-version: 12.0.0
+version: 13.0.0
 license: MIT
 platforms: [macos, linux, windows]
 metadata:
@@ -10,17 +10,24 @@ metadata:
     requires: [hermes-desktop, desktop-bridge]
 ---
 
-# Video Canvas Director — 生产级 AI 视频画布编排（v12.0 动作戏八大武术机位）
+# Video Canvas Director — 生产级 AI 视频画布编排（v13.0 角色一致性核心改造）
 
 When the user asks Hermes to **make a video, short film, music video, ad, multi-episode series, or adapt a novel/screenplay** — invoke this skill.
 
-> **v12.0 关键升级**
+> **v13.0 关键升级**（基于 [Nano Banana Pro 行业标准 5 步工作流](https://blog.laozhang.ai/en/posts/nano-banana-pro-face-consistency-guide) 调研）
 >
-> 1. **动作戏专用节点 `actionShotSet`**：基于 [studiobinder fight scene 经典指南](https://www.studiobinder.com/blog/how-to-storyboard-a-fight-scene/) + cinemadrop 4-beat 拆解，自动出 8 大武术机位（master-wide / tracking / low-angle / high-angle / Dutch tilt / slow-motion / POV / reaction），覆盖徒手武打、追逐戏、特技戏、吊威亚、兵器对打 5 种 actionType；自动 spawn 8 张独立 image 子节点。
+> 1. **characterSheet Sequential 生成**：先跑 hero（front 正面）→ 用 hero 当 ref 并行跑剩余 N-1 张。加 Identity Lock Prompt 公式（5 维面部特征锁定）。一致性从 ~60% 提升到 ~90%。
+> 2. **Contact Sheet 拼大图**（`canvas_compose_contact_sheet`）：多张独立图 → ffmpeg 拼成 NxM 网格 PNG，解决 Veo 3.1 / Seedance / Kling 只接 1-3 张 ref 的硬上限。
+> 3. **Prompt Optimizer ⭐**（`canvas_optimize_prompt`）：一键扩写简短描述 → 专业 prompt。CommandBar 右上角 ⭐ 按钮。
+> 4. **image2video subjectRefs 端口**：接 characterSheet.views 或 contact sheet，传给视频模型做角色一致性。
+> 5. **6 视图 sweet spot**：行业推荐 6 张（3 angles × 2），超过 10 反而降质。
+>
+> **v12.0 升级**
+> 1. **动作戏专用节点 `actionShotSet`**：8 大武术机位 + 4 beat 节奏 + 5 种 actionType。
 >
 > **v11.0 升级**
-> 1. **剧本医生（`canvas_run_script_doctor`）**：scriptGen 跑完后调，调 vision 模型按 6 维评分（钩子 / 角色弧 / 节奏 / 对白 / 视觉化 / 情感张力），输出整体评级 + 具体改进建议（critical/high/medium/low）+ 可选 AI 修订版 scenes。
-> 2. **音乐 / 音效节点（`musicGen`）**：用诗云 vidu audio1.0 / kling-audio 文生音效，单段 BGM（10s 内）或卡点分段时间戳。输出 audioUrl，可接 image2video.audioRef / videoConcat.bgmUrl / audio2video.audio。
+> 1. **剧本医生（`canvas_run_script_doctor`）**：6 维评分 + 改进建议 + 可选 AI 修订版。
+> 2. **音乐 / 音效节点（`musicGen`）**：vidu audio1.0 / kling-audio 文生音效。
 > 3. v10 的 shotSet / dialogueShot / cutPattern / 项目编导档案 全部保留。
 
 ---
@@ -338,6 +345,14 @@ Phase 1-3 输出完后，hermes **必须**说：
 |---|---|
 | `kind="actionShotSet"` | 动作戏 8 大武术机位（master-wide / tracking / 仰拍 / 俯拍 / Dutch / 慢镜 / POV / 反应）；支持 4 beat（setup/exchanges/reversal/resolution）+ 5 actionType（fight/chase/stunt/wirework/sword）|
 | `canvas_run_action_shot_set(description, master_image_url, image_model, ...)` | 直接调（不用画布的快路径） |
+
+### 🆕 v13 — 角色一致性核心 + Prompt 优化
+| 工具 / 节点 | 用途 |
+|---|---|
+| `canvas_compose_contact_sheet(image_urls, cols?)` | 多张图拼成 NxM 网格大图（给 image2video 当单张 ref） |
+| `canvas_optimize_prompt(prompt, context?, model?)` | ⭐ 一键扩写 prompt → 专业级（中文，含镜头/光线/风格/Negative） |
+| `image2video.subjectRefs` 输入端口 | 接 characterSheet.views 或 contact sheet，传给视频模型做角色一致性 |
+| `characterSheet` viewCount=6 | 行业 sweet spot：6 张（3 angles × 2），超过 10 反而降质 |
 
 ---
 
@@ -1200,4 +1215,4 @@ skill_view(name="video-canvas-director", file_path="references/<file>")
 
 ---
 
-End of SKILL v12.0 main file. References live under `references/`.
+End of SKILL v13.0 main file. References live under `references/`.
