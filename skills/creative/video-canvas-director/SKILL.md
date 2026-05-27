@@ -346,11 +346,14 @@ Phase 1-3 输出完后，hermes **必须**说：
 | `kind="actionShotSet"` | 动作戏 8 大武术机位（master-wide / tracking / 仰拍 / 俯拍 / Dutch / 慢镜 / POV / 反应）；支持 4 beat（setup/exchanges/reversal/resolution）+ 5 actionType（fight/chase/stunt/wirework/sword）|
 | `canvas_run_action_shot_set(description, master_image_url, image_model, ...)` | 直接调（不用画布的快路径） |
 
-### 🆕 v13 — 角色一致性核心 + Prompt 优化
+### 🆕 v13 — 角色一致性核心 + Prompt 优化 + 抠图 / 扩图 / Film Analysis
 | 工具 / 节点 | 用途 |
 |---|---|
 | `canvas_compose_contact_sheet(image_urls, cols?)` | 多张图拼成 NxM 网格大图（给 image2video 当单张 ref） |
 | `canvas_optimize_prompt(prompt, context?, model?)` | ⭐ 一键扩写 prompt → 专业级（中文，含镜头/光线/风格/Negative） |
+| `canvas_cutout(image_url)` | ✂️ 抠图（去除背景，输出透明 PNG；优先本地 rembg，fallback AI） |
+| `canvas_outpaint(image_url, target_ratio, prompt?)` | ↔️ 扩图（保持原图不变，扩展到目标比例如 21:9） |
+| `canvas_film_analysis(video_url, model?)` | 🎬 视频反推分镜表（每 2s 抽帧 → vision 模型分析 shots/运镜/角度/内容 → 可复用 prompt） |
 | `image2video.subjectRefs` 输入端口 | 接 characterSheet.views 或 contact sheet，传给视频模型做角色一致性 |
 | `characterSheet` viewCount=6 | 行业 sweet spot：6 张（3 angles × 2），超过 10 反而降质 |
 
