@@ -1,7 +1,7 @@
 ---
 name: video-canvas-director
 description: "通过 Hermes 桌面端的无限画布做生产级 AI 电影。Hermes 是导演 + 制片厂主任，**搭画布不调 API**——按工作流 B（scriptGen → storyboard 风格锚 → 每镜头独立 image × 2 [首帧 + 末帧] → image2video → videoConcat）搭出可视化 pipeline，让用户看到每个镜头的独立分镜节点（占位 idle，运行后才出图）。基于 2026 年 Veo 3.1 / Sora 2 / Seedance 2.0 / Kling 2.6 工业实战。v7.3 强制 Phase Gates：剧本拆解 → 角色 Bible → 镜头规划 → 用户确认后才搭画布；时长按剧情节奏决定，不是模型上限填满。专业知识（题材模板/音频/双关键帧）按需 skill_view 子文件加载。"
-version: 8.0.0
+version: 9.0.0
 license: MIT
 platforms: [macos, linux, windows]
 metadata:
@@ -10,16 +10,18 @@ metadata:
     requires: [hermes-desktop, desktop-bridge]
 ---
 
-# Video Canvas Director — 生产级 AI 视频画布编排（v8.0 LibTV 范式）
+# Video Canvas Director — 生产级 AI 视频画布编排（v9.0 一图多能 + 多画布 + 表格视图）
 
 When the user asks Hermes to **make a video, short film, music video, ad, multi-episode series, or adapt a novel/screenplay** — invoke this skill.
 
-> **v8.0 关键升级（LibTV 团队版范式对齐）**
-> 1. **角色三视图 / 分镜跑完会自动 spawn N 个独立 image 子节点**（每张图都是画布上的独立节点，可单独 inpaint / 重跑 / 当下游 reference）。不再把 9 张图全塞父节点 outputs。用 `canvas_get_spawned_children(project_id, parent_node_id)` 拿子节点列表，挑 3 张连下游。
-> 2. **跨画布主体库**（人物 / 场景 / 道具 三类）：搭画布前先 `canvas_subject_list` 检索是否有可复用主体；命中就 `canvas_subject_load` + `canvas_op_add_node` 直接落地，不重新生成 → 省时间省积分 + 角色一致性更稳。
-> 3. **音乐驱动卡点**：`image2video` 节点新加 `audioRef` 字段，仅 nativeAudio 模型（Seedance 2.0 / Veo 3.1 / Sora 2 / Wan 2.6 等）识别，模型自动按音乐节奏出卡点视频。
-> 4. **一键自动重排**：`canvas_auto_layout(project_id)` 等同用户按 Shift+Option+F；画布超 15 节点或 spawn 后凌乱时主动调用。
-> 5. v7.4 的 Phase Gates / 中文 prompt 强制 / 6 段结构 / 工业级范例 / 时长由剧情决定 / 双关键帧锁定 **全部保留**。
+> **v9.0 关键升级**
+> 1. **一图多能（image 节点魔法工具栏）**：选中任意 image 节点，顶部魔法工具栏一键触发：📝 反推 prompt / 🔄 多角度（3/6/9）/ ✨ 高清 / ⏩ 演绎 3 秒后 / ⏪ 回溯 5 秒前。所有 magic 操作都自动 spawn 独立子节点，不污染原图。
+> 2. **独立文本节点 `kind="text"`**：用户单独写 prompt / 反推结果填充 / 笔记。可输出 prompt 给下游 image / storyboard / image2video 节点（覆盖它们的 prompt 字段）。
+> 3. **多画布（一项目多 canvas）**：一个项目可以有 N 张画布（短剧 main/ep1/ep2、多版本 cut-A/cut-B、长片分幕 act1/act2）。`canvas_create_subcanvas / canvas_list_subcanvases / canvas_open_subcanvas`。
+> 4. **分镜表格视图**：画布上方按钮"⊞ 表格 / ⊟ 画布"切换。表格视图行=scene，列=景别/运镜/灯光/色调/音效等专业字段，支持双击单元格编辑（写回 scriptGen.outputs.scenes）。
+> 5. **subjectType 扩展**：characterSheet 加 face / scene / prop 三种 mode（除了人物全身）。场景一致性靠"前/左/右/后"四方位多视图，不需要 720° 全景。
+> 6. **storyboard mode**：normal / 25-grid（5×5 网格 25 张连贯分镜）/ 4-panel-story（2×2 剧情四宫格）。25/4 网格自动拆图 spawn N 子节点。
+> 7. v8 的 spawn / 主体库 / 重排 / 音乐驱动 全部保留。
 
 ---
 
@@ -297,6 +299,142 @@ Phase 1-3 输出完后，hermes **必须**说：
 | `canvas_subject_load(subject_id)` | 拿主体完整数据（含 9 视图 url）落地 |
 | `canvas_subject_save(name, subject_type, cover_image_url, views, ...)` | 把当前画布上做出的角色/场景/道具存成跨画布资产 |
 | `canvas_subject_delete(subject_id)` | 清主体 |
+
+### 🆕 v9 — image 魔法 / 多画布 / 文本节点
+| 工具 | 何时用 |
+|---|---|
+| `canvas_run_reverse_prompt(image_url, vision_model?)` | 任意图反推中文工业级 prompt（用于 prompt 复用 / 风格学习） |
+| `canvas_run_temporal(image_url, direction, seconds)` | 演绎画面：after=N 秒后（image2video 抽末帧）/ before=N 秒前（image2image 反向） |
+| `canvas_create_subcanvas(project_id, name)` | 项目内新建一张画布（短剧分集 / 多版本 / 分幕） |
+| `canvas_list_subcanvases(project_id)` | 列项目内所有画布（main 永远第一）|
+| `canvas_open_subcanvas(project_id, canvas_id)` | 拿某张画布的完整 nodes/edges |
+| `canvas_rename_subcanvas` / `canvas_delete_subcanvas` | 改名 / 删除（main 不能删） |
+
+### 🆕 v9 — 节点新参数
+| 节点 | 新字段 | 取值 |
+|---|---|---|
+| characterSheet | `subject_type` | "character"（人物全身, default）/ "face"（脸部三视图）/ "scene"（场景四方位）/ "prop"（产品三视图） |
+| storyboard | `mode` | "normal"（默认）/ "25-grid"（5×5 大网格自动拆 25 张）/ "4-panel-story"（2×2 剧情四宫格自动拆 4 张） |
+| image2video | `audioRef` | 音频 URL（卡点视频，仅 nativeAudio 模型识别） |
+| 新节点 | `kind="text"` | 独立文本节点，输出 `text` 给下游 image/storyboard/image2video 的 prompt 输入端口 |
+
+---
+
+## 🆕 v9 — image 魔法工具栏工作流
+
+任意 image 节点（含 spawn 出来的子节点）选中后，顶部出现 6 个魔法按钮。所有按钮都会自动 spawn 子节点（不修改原图）：
+
+```
+[选中 image 节点]
+       ↓
+       ▼ 顶部工具栏 ▼
+┌─────────────────────────────────────────────────┐
+│ 📝 反推 │ 🔄 多角度 │ ✨ 高清 │ ⏩ 3s 后 │ ⏪ 5s 前 │
+└─────────────────────────────────────────────────┘
+
+📝 反推 → spawn 1 个 text 子节点（role=reverse-prompt，含 6 段中文 prompt）
+🔄 多角度 → spawn 3/6/9 个 image 子节点（同物体不同角度）
+✨ 高清 → spawn 1 个 image 子节点（原图高清版）
+⏩ 演绎 3 秒后 → spawn 1 个 image 子节点（视频抽帧）
+⏪ 回溯 5 秒前 → spawn 1 个 image 子节点（image2image 反向）
+```
+
+hermes 用 MCP 工具触发：
+- `canvas_run_reverse_prompt(image_url)` 反推
+- `canvas_run_temporal(image_url, "after", 3)` 演绎
+- 多角度：调 `canvas_run_character_sheet(subject_type="character" | "scene", reference_image=image_url, view_count=3/6/9)`，跑完用 `canvas_get_spawned_children` 拿子节点
+
+---
+
+## 🆕 v9 — 多画布管理工作流
+
+```
+项目"红楼梦短剧"/
+  ├─ main.vcanvas.json   ← 默认画布
+  ├─ ep1.vcanvas.json    ← canvas_create_subcanvas("红楼梦短剧", "ep1")
+  ├─ ep2.vcanvas.json    ← canvas_create_subcanvas("红楼梦短剧", "ep2")
+  └─ pilot.vcanvas.json  ← 试拍版本
+```
+
+**关键：主体库跨画布共享**，所以同一角色 / 场景 / 道具在所有画布都能复用，不需要每集重做。
+
+hermes 工作流：
+1. 用户说"做第二集" → `canvas_list_subcanvases` 看是否已有 ep2 → 没有就 `canvas_create_subcanvas`
+2. 在 ep2 画布上工作时，`canvas_subject_list` 检索 ep1 已存的角色 / 场景 / 道具 → 命中就 load + add_node 落地
+3. 跨集只新做新增的角色 / 场景
+
+---
+
+## 🆕 v9 — 分镜表格视图
+
+用户切换"⊞ 表格 / ⊟ 画布"后，表格视图渲染当前画布所有 scriptGen.outputs.scenes：
+- 行：每个 scene
+- 列：序号 / 时长 / 剧情 / 角色 / 镜头缩略图 / 景别 / 运镜 / 灯光 / 色调 / 音效 / 视频状态 / 操作
+- 双击单元格 → 编辑 → 自动写回 scriptGen.outputs.scenes[i]
+- 行操作：🎯 跳到画布定位 / ↻ 重跑该格
+
+hermes 不需要直接操作表格 UI（用户层用），但需要知道**当用户改了表格里某行的 cameraMovement 字段后，对应 storyboard 节点会自动重跑那一格**。
+
+---
+
+## 🆕 v9 — characterSheet subjectType 工作流
+
+```
+用户："给我做个院子的多方位场景"
+  ↓
+hermes 调 canvas_op_add_node(kind="characterSheet", data={
+  name: "古风院子",
+  description: "宋代庭院, 假山曲径, 月夜, 微风…（≥200 字）",
+  subjectType: "scene",
+  viewCount: 4,    // scene mode 默认 4 方位（前/左/右/后）；6 方位加俯视/细节
+})
+  ↓
+跑完 spawn 4 张独立 image 子节点（前/左/右/后）
+  ↓
+canvas_get_spawned_children → 拿 4 个子节点 id
+  ↓
+hermes 把不同方位连给不同镜头的 image2video（保证场景空间一致性）
+```
+
+同理：
+- `subject_type="face"`：脸部三视图（正脸/45°/纯侧脸），用于换脸 / 数字人
+- `subject_type="prop"`：产品三/六视图（电商详情页风格）
+
+---
+
+## 🆕 v9 — storyboard mode 工作流
+
+```
+mode="normal"（默认）：N 个 scene → spawn N 张分镜（v8 行为）
+mode="25-grid"：1 次调用 → 5×5 大网格图 → 后端拆 25 张 → spawn 25 张独立子节点
+mode="4-panel-story"：1 次调用 → 2×2 剧情四宫格 → 拆 4 张 → spawn 4 张子节点
+```
+
+什么时候用 25-grid / 4-panel-story：
+- 用户说"给我 4 张图把这场戏讲完"→ 4-panel-story
+- 用户说"密集的连续分镜，节奏紧"→ 25-grid
+- 标准长篇剧情 → normal（每 scene 独立精修空间大）
+
+---
+
+## 🆕 v9 — text 节点工作流（独立 prompt）
+
+```
+[text 节点] (用户写: "雪夜古风长街…")
+        ↓
+        ↓ 输出 text
+        ↓
+[image 节点] ← 上游 text 覆盖本地 prompt
+        ↓
+        ↓ 输出 images
+        ↓
+[image2video 节点]
+```
+
+适用场景：
+- 同一个 prompt 想给多个生成节点共用 → 一个 text 节点连 N 个下游
+- "反推 prompt" 自动落地的 text 子节点 → 用户直接连给新的 image 节点复刻原图风格
+- 长 prompt 不想塞进 image 节点的字段里 → 单独一张 text 卡片更清楚
 
 ---
 
