@@ -1,7 +1,7 @@
 ---
 name: video-canvas-director
 description: "通过 Hermes 桌面端的无限画布做生产级 AI 电影。Hermes 是导演 + 制片厂主任，**搭画布不调 API**——按工作流 B（scriptGen → storyboard 风格锚 → 每镜头独立 image × 2 [首帧 + 末帧] → image2video → videoConcat）搭出可视化 pipeline，让用户看到每个镜头的独立分镜节点（占位 idle，运行后才出图）。基于 2026 年 Veo 3.1 / Sora 2 / Seedance 2.0 / Kling 2.6 工业实战。v7.3 强制 Phase Gates：剧本拆解 → 角色 Bible → 镜头规划 → 用户确认后才搭画布；时长按剧情节奏决定，不是模型上限填满。专业知识（题材模板/音频/双关键帧）按需 skill_view 子文件加载。"
-version: 9.0.0
+version: 10.0.0
 license: MIT
 platforms: [macos, linux, windows]
 metadata:
@@ -10,18 +10,17 @@ metadata:
     requires: [hermes-desktop, desktop-bridge]
 ---
 
-# Video Canvas Director — 生产级 AI 视频画布编排（v9.0 一图多能 + 多画布 + 表格视图）
+# Video Canvas Director — 生产级 AI 视频画布编排（v10.0 编导级专业能力）
 
 When the user asks Hermes to **make a video, short film, music video, ad, multi-episode series, or adapt a novel/screenplay** — invoke this skill.
 
-> **v9.0 关键升级**
-> 1. **一图多能（image 节点魔法工具栏）**：选中任意 image 节点，顶部魔法工具栏一键触发：📝 反推 prompt / 🔄 多角度（3/6/9）/ ✨ 高清 / ⏩ 演绎 3 秒后 / ⏪ 回溯 5 秒前。所有 magic 操作都自动 spawn 独立子节点，不污染原图。
-> 2. **独立文本节点 `kind="text"`**：用户单独写 prompt / 反推结果填充 / 笔记。可输出 prompt 给下游 image / storyboard / image2video 节点（覆盖它们的 prompt 字段）。
-> 3. **多画布（一项目多 canvas）**：一个项目可以有 N 张画布（短剧 main/ep1/ep2、多版本 cut-A/cut-B、长片分幕 act1/act2）。`canvas_create_subcanvas / canvas_list_subcanvases / canvas_open_subcanvas`。
-> 4. **分镜表格视图**：画布上方按钮"⊞ 表格 / ⊟ 画布"切换。表格视图行=scene，列=景别/运镜/灯光/色调/音效等专业字段，支持双击单元格编辑（写回 scriptGen.outputs.scenes）。
-> 5. **subjectType 扩展**：characterSheet 加 face / scene / prop 三种 mode（除了人物全身）。场景一致性靠"前/左/右/后"四方位多视图，不需要 720° 全景。
-> 6. **storyboard mode**：normal / 25-grid（5×5 网格 25 张连贯分镜）/ 4-panel-story（2×2 剧情四宫格）。25/4 网格自动拆图 spawn N 子节点。
-> 7. v8 的 spawn / 主体库 / 重排 / 音乐驱动 全部保留。
+> **v10.0 关键升级（编导专业能力）**
+> 1. **shotSet 节点（镜头组）**：基于一张主参考图 + 角色多视图，输出 master / reverse / closeup / OTS 一组镜头，**严守 180° 轴线**，解决场景空间一致性。
+> 2. **dialogueShot 节点（对话场景 8 镜头）**：双角色对话标准 8 件套（建立 / 双人 / OTS×2 / 特写×2 / 反应×2），A 永远屏幕左 B 永远屏幕右，杜绝跨轴。
+> 3. **videoConcat cutPattern**：standard / rapid-cut（快剪紧张感）/ j-cut / l-cut / montage（蒙太奇）。
+> 4. **项目级 lookProfile**：色温/主色调/对比度/影调/颗粒，自动注入所有节点 prompt 末尾，整片色彩统一。
+> 5. **项目级 audioBible**：主题音乐/主角主题/环境声/Foley，注入 image2video prompt，整片声音设计统一。
+> 6. v9 的 magic toolbar / 多画布 / 表格视图 / text 节点 全部保留。
 
 ---
 
@@ -318,6 +317,15 @@ Phase 1-3 输出完后，hermes **必须**说：
 | image2video | `audioRef` | 音频 URL（卡点视频，仅 nativeAudio 模型识别） |
 | 新节点 | `kind="text"` | 独立文本节点，输出 `text` 给下游 image/storyboard/image2video 的 prompt 输入端口 |
 
+### 🆕 v10 — 编导级专业能力
+| 工具 / 节点 | 用途 |
+|---|---|
+| `kind="shotSet"` | 同场景的镜头组（master + reverse + closeup + OTS）— 守 180° 轴线 |
+| `kind="dialogueShot"` | 双角色对话 8 镜头标准（A 左 B 右严守不跨轴）|
+| videoConcat `cutPattern` | "standard" / "rapid-cut" / "j-cut" / "l-cut" / "montage" |
+| `canvas_save_director_bible(project_id, look_profile, audio_bible)` | 保存项目级色彩+声音档案，自动注入所有节点 prompt |
+| `canvas_load_director_bible(project_id)` | 读项目档案 |
+
 ---
 
 ## 🆕 v9 — image 魔法工具栏工作流
@@ -414,6 +422,72 @@ mode="4-panel-story"：1 次调用 → 2×2 剧情四宫格 → 拆 4 张 → sp
 - 用户说"给我 4 张图把这场戏讲完"→ 4-panel-story
 - 用户说"密集的连续分镜，节奏紧"→ 25-grid
 - 标准长篇剧情 → normal（每 scene 独立精修空间大）
+
+---
+
+---
+
+## 🆕 v10 — 镜头组（shotSet）：场景空间一致性
+
+```
+[image / storyboard] 主参考图
+        ↓
+shotSet description="..." shotTypes=[master,reverse,closeup,ots-a]
+        ↓ 跑完 spawn 4 张子节点（轴线一致 / 同灯光 / 同色调）
+```
+
+为什么需要 shotSet：同一参考图作为输入 → 模型理解"这是同一个空间"；严格 prompt → 强制 180° 轴线规则。
+
+## 🆕 v10 — 对话场景（dialogueShot）
+
+剧情片 70% 镜头是对话。dialogueShot 是双人对话场景的标准 8 镜头：
+
+```
+characterSheet A（屏幕左）+ characterSheet B（屏幕右）+ 场景图
+        ↓
+dialogueShot characterAName/characterBName/sceneDescription/dialogue
+        ↓ spawn 8 张：
+  establishing / two-shot / ots-a-to-b / ots-b-to-a
+  / close-a / close-b / reaction-a / reaction-b
+```
+
+A 永远屏幕左、B 永远屏幕右，杜绝跨轴。
+
+## 🆕 v10 — videoConcat cutPattern
+
+| pattern | 适用 |
+|---|---|
+| standard | 默认 |
+| rapid-cut | 动作戏 / 卡点（每段 ≤1s） |
+| j-cut | 对话戏 / 情感转场（声音先入） |
+| l-cut | 连续氛围 |
+| montage | 时间流逝（强 crossfade + BGM 上调） |
+
+## 🆕 v10 — 项目级编导档案（lookProfile + audioBible）
+
+**Phase 4 建项目时，第 1 件事**调 `canvas_save_director_bible` 定档案。之后所有 image / image2video / storyboard / shotSet / dialogueShot 节点跑时，**自动注入 prompt 末尾**。
+
+```python
+canvas_save_director_bible(
+  project_id=...,
+  look_profile={
+    "name":"宋代古风冷青调",
+    "colorTemperature":"cool",
+    "dominantTones":"青灰偏冷，月夜银白点缀",
+    "contrast":"high",
+    "keyLighting":"low-key 低调",
+    "filmGrain":"film-grain-light"
+  },
+  audio_bible={
+    "themeMusicStyle":"古风弦乐 + 笛箫",
+    "characterMotif":"男主 motif：古琴单音 + 弦乐渐起",
+    "ambientBaseline":"雨夜：雨声 + 远处更夫梆子",
+    "foleyStyle":"极简"
+  }
+)
+```
+
+整片色调 + 声音设计自动统一，hermes 不用每个节点重复写。
 
 ---
 
