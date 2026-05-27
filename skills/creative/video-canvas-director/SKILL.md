@@ -1200,4 +1200,4 @@ skill_view(name="video-canvas-director", file_path="references/<file>")
 
 ---
 
-End of SKILL v7.3 main file. References live under `references/`.
+End of SKILL v12.0 main file. References live under `references/`.
