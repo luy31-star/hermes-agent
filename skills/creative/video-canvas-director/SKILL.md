@@ -1,7 +1,7 @@
 ---
 name: video-canvas-director
-description: "通过 Hermes 桌面端的无限画布做生产级 AI 电影。Hermes 是导演 + 制片厂主任，**搭画布不调 API**——按工作流 B（scriptGen → storyboard 风格锚 → 每镜头独立 image × 2 [首帧 + 末帧] → image2video → videoConcat）搭出可视化 pipeline，让用户看到每个镜头的独立分镜节点（占位 idle，运行后才出图）。基于 2026 年 Veo 3.1 / Sora 2 / Seedance 2.0 / Kling 2.6 工业实战。v7.3 强制 Phase Gates：剧本拆解 → 角色 Bible → 镜头规划 → 用户确认后才搭画布；时长按剧情节奏决定，不是模型上限填满。专业知识（题材模板/音频/双关键帧）按需 skill_view 子文件加载。"
-version: 11.0.0
+description: "通过 Hermes 桌面端的无限画布做生产级 AI 电影。Hermes 是导演 + 制片厂主任，**搭画布不调 API**——按工作流 B（scriptGen → storyboard 风格锚 → 每镜头独立 image × 2 [首帧 + 末帧] → image2video → videoConcat）搭出可视化 pipeline，让用户看到每个镜头的独立分镜节点（占位 idle，运行后才出图）。基于 2026 年 Veo 3.1 / Sora 2 / Seedance 2.0 / Kling 2.6 工业实战。v7.3 强制 Phase Gates：剧本拆解 → 角色 Bible → 镜头规划 → 用户确认后才搭画布；时长按剧情节奏决定，不是模型上限填满。v12 加动作戏 8 大武术机位（actionShotSet）。专业知识（题材模板/音频/双关键帧）按需 skill_view 子文件加载。"
+version: 12.0.0
 license: MIT
 platforms: [macos, linux, windows]
 metadata:
@@ -10,11 +10,15 @@ metadata:
     requires: [hermes-desktop, desktop-bridge]
 ---
 
-# Video Canvas Director — 生产级 AI 视频画布编排（v11.0 剧本医生 + 音乐生成）
+# Video Canvas Director — 生产级 AI 视频画布编排（v12.0 动作戏八大武术机位）
 
 When the user asks Hermes to **make a video, short film, music video, ad, multi-episode series, or adapt a novel/screenplay** — invoke this skill.
 
-> **v11.0 关键升级**
+> **v12.0 关键升级**
+>
+> 1. **动作戏专用节点 `actionShotSet`**：基于 [studiobinder fight scene 经典指南](https://www.studiobinder.com/blog/how-to-storyboard-a-fight-scene/) + cinemadrop 4-beat 拆解，自动出 8 大武术机位（master-wide / tracking / low-angle / high-angle / Dutch tilt / slow-motion / POV / reaction），覆盖徒手武打、追逐戏、特技戏、吊威亚、兵器对打 5 种 actionType；自动 spawn 8 张独立 image 子节点。
+>
+> **v11.0 升级**
 > 1. **剧本医生（`canvas_run_script_doctor`）**：scriptGen 跑完后调，调 vision 模型按 6 维评分（钩子 / 角色弧 / 节奏 / 对白 / 视觉化 / 情感张力），输出整体评级 + 具体改进建议（critical/high/medium/low）+ 可选 AI 修订版 scenes。
 > 2. **音乐 / 音效节点（`musicGen`）**：用诗云 vidu audio1.0 / kling-audio 文生音效，单段 BGM（10s 内）或卡点分段时间戳。输出 audioUrl，可接 image2video.audioRef / videoConcat.bgmUrl / audio2video.audio。
 > 3. v10 的 shotSet / dialogueShot / cutPattern / 项目编导档案 全部保留。
@@ -329,6 +333,12 @@ Phase 1-3 输出完后，hermes **必须**说：
 | `canvas_run_script_doctor(scenes, user_intent?)` | scriptGen 跑完后调，按 6 维评分 + 改进建议（critical/high/medium/low）+ 可选 AI 修订版 |
 | `kind="musicGen"` | 文生音效 / BGM（vidu audio1.0 / kling-audio）；单段或卡点分段 |
 
+### 🆕 v12 — 动作戏（八大武术机位）
+| 工具 / 节点 | 用途 |
+|---|---|
+| `kind="actionShotSet"` | 动作戏 8 大武术机位（master-wide / tracking / 仰拍 / 俯拍 / Dutch / 慢镜 / POV / 反应）；支持 4 beat（setup/exchanges/reversal/resolution）+ 5 actionType（fight/chase/stunt/wirework/sword）|
+| `canvas_run_action_shot_set(description, master_image_url, image_model, ...)` | 直接调（不用画布的快路径） |
+
 ---
 
 ## 🆕 v9 — image 魔法工具栏工作流
@@ -547,6 +557,117 @@ canvas_op_add_node(kind="musicGen", data_json={
 - 单镜卡点 → image2video.audioRef（仅 nativeAudio 模型识别）
 
 ⚠️ duration ≤ 10s；超过分多段 musicGen + 后期拼接。
+
+---
+
+## 🆕 v12 — 动作戏（actionShotSet）：八大武术机位
+
+> **调研依据**：[studiobinder.com — How to Storyboard a Fight Scene](https://www.studiobinder.com/blog/how-to-storyboard-a-fight-scene/) + cinemadrop fight-scene beat 拆解。原文要点已重写以符合许可。
+
+### 行业准则（来自调研）
+
+1. **不同景别组合**（wide / medium / close）— 全用 medium 会显得重复，wide 让观众重新定位空间
+2. **机位角度切换 power shifts** — high angle 显弱势 / low angle 显强势 / Dutch angle 制造失衡
+3. **deep depth of field** — 动作戏快速运动需要深景深保持焦点
+4. **camera movement 三种** — handheld（混乱）/ Steadicam（流畅 John Wick 风）/ tracking dolly
+5. **slow motion 标志性瞬间** — Matrix / Gladiator / Deadpool 都用过，需高 FPS
+6. **lens 选择** — wide-angle 强调动作和空间感，telephoto 压缩空间让招式看起来更接触
+7. **构图卖招式** — profile shot 卖钩拳（藏空间），over-shoulder 卖正面踢腿
+
+### 8 大武术 / 动作戏机位（actionShotSet 默认全开）
+
+| 机位 key | 中文 | 用途 |
+|---|---|---|
+| `master-wide` | 主大全 | 建立空间 + choreography 全貌（Steadicam 风） |
+| `tracking-follow` | 跟拍 | dolly / Steadicam 跟随主体动作 |
+| `low-angle-power` | 仰拍 | 强势方 power up（看上去高大压迫） |
+| `high-angle-fall` | 俯拍 | 弱势方 power down（被压制 / 渺小） |
+| `dutch-tilt` | 倾斜 | Dutch angle 失衡瞬间（混乱 / 反转） |
+| `slow-motion-impact` | 慢镜 | 标志性接触瞬间（高 FPS）|
+| `pov-attacker` | POV | 攻击者第一视角（沉浸威胁感） |
+| `reaction-defender` | 反应 | 防守者面部反应特写 |
+
+### 4 beat 节奏拆解（cinemadrop 标准）
+
+按一场打戏内部时间顺序：
+
+| beat | 含义 | 推荐机位组合 |
+|---|---|---|
+| `setup`（铺垫） | 交手前的紧张静默：对峙、距离评估、肢体微动 | master-wide + low-angle-power（强势方）+ reaction-defender |
+| `exchanges`（交锋） | 招式来回连续交替；动态最强 | tracking-follow + slow-motion-impact + pov-attacker |
+| `reversal`（反转） | 胜势翻转的关键瞬间；表情从胜券在握转震惊 | high-angle-fall（原强势变弱势）+ dutch-tilt + slow-motion-impact |
+| `resolution`（收势） | 定胜负后的余韵 | master-wide + reaction（双方）+ low-angle-power（胜者） |
+
+### actionType 5 种用例
+
+| actionType | 适用 | 关键调度 |
+|---|---|---|
+| `fight`（默认） | 徒手武打 | profile + over-shoulder 卖招式 |
+| `chase` | 追逐戏 | tracking-follow 占主导 + 频繁切机位制造紧张 |
+| `stunt` | 特技戏 | slow-motion-impact 慢镜密集 + 多机位安全冗余 |
+| `wirework` | 吊威亚飞行打斗 | low-angle-power 仰拍夸张飞行高度 + Dutch tilt |
+| `sword` | 兵器对打 | profile shot + slow-mo 卖刃刃相接 + 火花反光 |
+
+### chaosLevel 摄影风格
+
+- `steadicam`（默认 John Wick 风）：干净、连续、舞蹈式调度，**适合**：表现专业、克制、高水准武术
+- `handheld`（混乱风）：贴身、抖动、浑浊，**适合**：街斗、求生混战、被动挨揍
+
+### axisRule 轴线
+
+- `preserve`（默认）：守 180° 轴线（攻防双方左右关系不跨轴）
+- `break`：可破轴 — **仅在**多人混战 / 乱斗为表现混乱才用，否则观众会迷向
+
+### 工作流示例
+
+**短篇武术片 — 一场两人决斗：**
+```python
+# 1. 角色三视图（主角 + 反派各一个 characterSheet）
+char_hero = canvas_op_add_node(kind="characterSheet", data_json={
+  "name": "夜枭", "subjectType": "character", "viewCount": 9,
+  "description": "宋代刺客，黑衣斗篷，单刀"
+})
+char_villain = canvas_op_add_node(kind="characterSheet", data_json={
+  "name": "鬼面", "subjectType": "character", "viewCount": 9,
+  "description": "鬼面具甲士，长枪"
+})
+
+# 2. 场景图（决斗场地）
+scene = canvas_op_add_node(kind="image", data_json={
+  "prompt": "雪夜山顶古寺前，月光照地，远山模糊；冷青色调",
+  "imageModel": "seedream-4.0", "aspectRatio": "16:9"
+})
+
+# 3. 一场两人决斗 → 4 个 actionShotSet 节点（4 个 beat 各一个）
+for beat in ["setup", "exchanges", "reversal", "resolution"]:
+  canvas_op_add_node(kind="actionShotSet", data_json={
+    "description": "雪夜山顶古寺前，夜枭单刀对鬼面长枪。气氛凝重，月光照刃。",
+    "actionType": "sword",       # 兵器对打
+    "pacing": "methodical",      # 节制重击
+    "chaosLevel": "steadicam",   # 流畅
+    "axisRule": "preserve",      # 守轴
+    "beat": beat,
+    "imageModel": "seedream-4.0"
+  })
+  # 连主参考图（场景）+ 角色多视图
+  canvas_op_connect(scene_id, "images", action_id, "master")
+  canvas_op_connect(char_hero_id, "views", action_id, "characters")
+```
+
+跑完每个 actionShotSet 都自动 spawn 8 张独立 image 子节点 → 用户挑出最满意的几张 → 接 image2video → videoConcat 用 `cutPattern="rapid-cut"` 紧张感成片。
+
+### MCP 工具
+
+| 工具 | 说明 |
+|---|---|
+| `canvas_op_add_node(kind="actionShotSet", data_json={...})` | 加节点 |
+| `canvas_run_action_shot_set(...)` | 直接调（不用画布的快路径） |
+
+### Edge 规则
+
+- 输入：`image.images` 或 `storyboard.boards` → `actionShotSet.master`（必填）
+- 输入：`characterSheet.views` → `actionShotSet.characters`（可选，强烈推荐）
+- 输出：`actionShotSet.shots` → `image2video.image` / `shotGroup.boards_multi` / `preview.any`
 
 ---
 
