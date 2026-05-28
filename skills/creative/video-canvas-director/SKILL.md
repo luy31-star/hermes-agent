@@ -330,65 +330,104 @@ canvas_save_director_bible(
 )
 ```
 
-### Step 3 — 角色立绘（characterSheet 节点 — 自动 spawn N 视图）
+### Step 3 — 角色立绘（**纯 image 节点 + 快路径，对齐 LibTV**）
 
 **导演视角**：这是漫剧第一道质量关。一个角色错了，全片崩。
 
-**LibTV 范式**：用 `kind="characterSheet"` 节点，跑完**执行器自动 spawn N 个独立 image 子节点**（每张图都是画布上的独立节点，可单独 inpaint / 重跑 / 当下游 reference）。父节点只显示**参考图**，不再把多张图压在 360x210 小卡片里。
+**LibTV 范式**：**禁止 add `kind="characterSheet"` 节点**。改用以下三步流：
+1. 用 `canvas_add_node(kind="image")` 上传/生成 hero 参考图
+2. 用 `canvas_run_character_sheet(reference_image=<hero URL>, ...)` 拿 N 个角度 URL（**不上画布，只返 URL**）
+3. 用 `canvas_spawn_children` 把 N 张 URL 落地为 **N 个独立 image 子节点**
+
+这样父节点是清晰大图、子节点是独立可编辑的视图，对齐 LibTV "image 节点 + 右键创建主体 → 自动 spawn 9 角度" 的产品形态。
 
 ```python
-# Step 3a：先去主体库找有没有现成角色
+# Step 3a：先去主体库找现成角色（跨集复用）
 existing = canvas_subject_list(type_filter="character")
-# 如果命中（同一角色跨集复用），用 canvas_subject_load 拿 views URL，
-# 然后 canvas_add_node(kind="characterSheet", status="done", outputs.views=[...])
-# 跳过下面的生成步骤
+# 命中 → 用 canvas_subject_load 拿 views，直接 add_node + spawn_children 跳过生成
 
-# Step 3b：没现成的 → 加 characterSheet 节点
-char_hero = canvas_add_node(
+# Step 3b：没现成的 → 加 image 节点（hero 参考图）
+hero_node = canvas_add_node(
   project_id=pid,
-  kind="characterSheet",
-  data_json='{"name":"白衣少年剑仙","description":"<Phase 2 角色 Bible 全文 ≥800 字符>","imageModel":"doubao-seedream-5.0","viewCount":6,"subjectType":"character"}',
+  kind="image",
+  data_json=json.dumps({
+    "prompt": "<Phase 2 角色 Bible 全文 ≥800 字符>",
+    "imageModel": "doubao-seedream-5.0",
+    "aspectRatio": "1:1",
+    "count": 1
+  }),
   position_x=100, position_y=100
 )
+# 跑节点 → 拿 hero URL
+canvas_run_node(pid, hero_node["nodeId"], mode="only")
 
-# Step 3c：跑节点 — 执行器内部做：
-#   - sequential 生成（先 hero → 用 hero 当 ref 跑剩 N-1 张）
-#   - 自动注入 5 维 Identity Lock prompt 公式
-#   - 跑完自动 canvas_spawn_children 出 N 个独立 image 子节点
-#   - hero 写入父节点 referenceImage（父节点显示清晰大图）
-canvas_run_node(pid, char_hero["nodeId"], mode="only")
-
-# Step 3d：拿 spawn 出来的子节点列表 → 拼 contact sheet
+# Step 3c：拿 hero URL，调快路径生成 6 视图
 state = canvas_get_state(pid)
-parent = next(n for n in state["nodes"] if n["id"] == char_hero["nodeId"])
-view_urls = [v["url"] for v in parent["data"]["outputs"]["views"]]
+hero = next(n for n in state["nodes"] if n["id"] == hero_node["nodeId"])
+hero_url = hero["data"]["outputs"]["images"][0]["url"]
 
+views = canvas_run_character_sheet(
+  name="白衣少年剑仙",
+  description="<Phase 2 全文>",
+  reference_image=hero_url,
+  image_model="doubao-seedream-5.0",
+  view_count=6,
+  subject_type="character"
+)
+# views["views"] = [{angle:"front", url:...}, {angle:"side", url:...}, ...]
+
+# Step 3d：把 6 张 URL spawn 成 6 个独立 image 子节点
+import json as _json
+canvas_spawn_children(
+  project_id=pid,
+  parent_node_id=hero_node["nodeId"],
+  children_json=_json.dumps([
+    {
+      "kind": "image",
+      "data": {
+        "kind": "image",
+        "prompt": f"{v['angle']} 视角 - 白衣少年剑仙",
+        "imageModel": "doubao-seedream-5.0",
+        "aspectRatio": "1:1",
+        "count": 1,
+        "status": "done",
+        "outputs": {"images": [{"url": v["url"]}]},
+        "meta": {
+          "parentNodeId": hero_node["nodeId"],
+          "parentKind": "image",
+          "spawnLabel": v["angle"],
+          "spawnSource": "character-sheet"
+        }
+      }
+    }
+    for v in views["views"]
+  ])
+)
+
+# Step 3e：拼 Contact Sheet（给 image2video.subjectRefs 用）
+view_urls = [v["url"] for v in views["views"]]
 contact = canvas_compose_contact_sheet(image_urls=view_urls, cols=3)
-# contact["url"] = pose sheet 大图（后面给 image2video 当单张 subjectRefs）
 
-# Step 3e：跨集复用 → 存主体库
+# Step 3f：跨集复用 → 存主体库
 canvas_subject_save(
   name="白衣少年剑仙",
   subject_type="character",
-  cover_image_url=parent["data"].get("referenceImage") or view_urls[0],
-  views=[{"label": v["angle"], "url": v["url"]} for v in parent["data"]["outputs"]["views"]],
+  cover_image_url=hero_url,
+  views=[{"label": v["angle"], "url": v["url"]} for v in views["views"]],
   description="<Phase 2 全文>",
   image_model="doubao-seedream-5.0",
-  tags=["古风", "武侠", "主角", "白衣", "剑仙"],
+  tags=["古风", "武侠", "主角"],
   source_project_id=pid,
-  source_node_id=char_hero["nodeId"]
+  source_node_id=hero_node["nodeId"]
 )
 ```
 
-**为什么这样做**（对齐 LibTV 范式）：
-- characterSheet 父节点本质是"参考图节点"（用户看到 hero 大图）
-- N 张视图作为独立 image 子节点散布在画布上，用户能挑选/编辑/重跑/删除单张
-- 对单张视图不满意 → 选中那张子节点点 ▶ 重跑（独立操作）
+**🚨 红线：绝对不要再 `canvas_add_node(kind="characterSheet" / "shotSet" / "dialogueShot" / "actionShotSet")`** — 这些 kind 已从 palette 隐藏，是为向下兼容旧画布留的。新画布**只用 `kind="image"` 当父节点**。
 
-**反派 / 配角 / 场景 / 道具同样跑一遍**：
-- 场景：`subjectType="scene"`, `viewCount=6`（前/左/右/后/俯视/细节）
-- 道具：`subjectType="prop"`, `viewCount=6`
-- 脸部：`subjectType="face"`, `viewCount=3`
+**反派 / 配角 / 场景 / 道具同理**（每个一个 image 节点 + run_character_sheet + spawn_children）。
+- 场景：`subject_type="scene"`, `view_count=6`（前/左/右/后/俯视/细节）
+- 道具：`subject_type="prop"`, `view_count=6`
+- 脸部：`subject_type="face"`, `view_count=3`
 
 ### Step 4 — 风格锚（image 节点，1 张）
 
@@ -432,14 +471,15 @@ shot1_first = canvas_add_node(
   position_x=700, position_y=50
 )
 
-# 连接：char_hero（characterSheet）→ shot1_first.reference（首帧也要锁角色！）
-canvas_connect(pid, char_hero["nodeId"], "views", shot1_first["nodeId"], "reference")
-canvas_connect(pid, scene_temple["nodeId"], "views", shot1_first["nodeId"], "reference")
+# 连接：hero_node（image，已 spawn 6 视图子节点）→ shot1_first.reference
+# 用 hero_node 的 images 端口 — 它的 outputs.images[0] 就是 hero 正面图
+canvas_connect(pid, hero_node["nodeId"], "images", shot1_first["nodeId"], "reference")
+canvas_connect(pid, scene_temple["nodeId"], "images", shot1_first["nodeId"], "reference")
 canvas_connect(pid, style_anchor["nodeId"], "images", shot1_first["nodeId"], "styleRef")
 
 # 镜头 1 末帧（同样写 prompt，描述末帧画面）
 shot1_last = canvas_add_node(...)
-canvas_connect(pid, char_hero["nodeId"], "views", shot1_last["nodeId"], "reference")
+canvas_connect(pid, hero_node["nodeId"], "images", shot1_last["nodeId"], "reference")
 ```
 
 每个 prompt 都要：
