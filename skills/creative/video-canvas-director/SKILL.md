@@ -1,7 +1,7 @@
 ---
 name: video-canvas-director
 description: "通过 Hermes 桌面端的无限画布做生产级 AI 漫剧/短片。Hermes 扮演专业导演 + 制片厂主任，**搭画布不直接调 API**，按 2026 工业级 AI 漫剧 6 阶段流水线（Development → Pre-production → Production → Audio → Post → Delivery）搭出可视化 pipeline。基于 Nano Banana Pro Face Consistency 5 步法 + studiobinder 镜头语言 + 纳米空间引擎/Catimind/有戏 AI 的工业实战。v13.3 强制 Phase Gates：剧本拆解 → 角色 Bible → 镜头规划 → 用户确认后才搭画布；角色一致性靠 Sequential 生成 + Identity Lock + Contact Sheet + subjectRefs 四件套；时长按剧情节奏决定，不是模型上限填满。"
-version: 13.3.0
+version: 13.5.0
 license: MIT
 platforms: [macos, linux, windows]
 metadata:
@@ -26,12 +26,12 @@ When the user asks Hermes to **make a video, short film, micro-drama, comic-dram
 
 **核心信念**：决定漫剧成败的不是 AI 模型有多强，而是**导演的镜头语言 + 制片的工业流程**。即梦/可灵/Seedance 已经把生成质量拉到 90% 良品率，剩下 10% 取决于你怎么用。
 
-**v13.3 LibTV 范式**：
-> 复杂操作（多角度/镜头组/对话场景/动作戏）依然用 `kind="characterSheet" / "shotSet" / "dialogueShot" / "actionShotSet"` 节点，但这些节点现在的行为是**跑完自动 spawn N 个独立 image 子节点**，父节点只显示参考图。
+**v13.4 LibTV 范式（当前版本）**：
+> 画布只有**基础原子节点**：`image / image2video / audio2video / tts / musicGen / videoConcat / videoTrim / videoExtend / inpaint / upscale / subtitleRemoval / comicSplit / text / preview / scriptGen / shotGroup`。
 >
-> 这样父节点就是"清晰的参考图"，子节点是"独立可编辑的产出"，对齐 [LibTV 团队版](https://toolin.ai/blog/libtv-team-edition-ai-video-studio) 工业实测的最佳实践。
+> 复杂操作（多角度/镜头组/对话场景/动作戏）通过 **image 节点 + `canvas_run_character_sheet` 快路径 + `canvas_spawn_children` 三步流**完成：image 节点是"参考图父节点"，spawn 出的 N 个 image 子节点是"独立可编辑的产出"。
 >
-> Hermes 只用 **`canvas_add_node` + `canvas_connect` + `canvas_run_node`** 三件套即可，**不**需要再单独调 `canvas_run_character_sheet` 等"快路径"——节点跑起来后执行器自动 spawn。
+> **⚠️ `characterSheet / storyboard / shotSet / dialogueShot / actionShotSet` 节点已从代码中删除。Hermes 绝不能 add 这些 kind。**
 
 ---
 
@@ -161,14 +161,14 @@ When the user asks Hermes to **make a video, short film, micro-drama, comic-dram
 | 4 | 6s | 爆 | 凌晨 | 青龙破云吞黑雾（爽点）| 大全景 | 仰角 | 跟随升降 | 高对比金光 | 青碧 + 金 | 16mm 超广角 | — | 龙吟 + 雷鸣 | 慢镜 |
 | 5 | 4s | 缓 | 凌晨 | 少年被龙吞入，黑屏字幕 | 全景→黑场 | 平视 | 跟随 | 金光过曝 | 金白 → 黑 | 50mm | 站立 → 消失 | 龙息 + 静默 | 单镜头 |
 
-**判断"什么镜头要单镜头 vs shotSet vs dialogueShot vs actionShotSet"**：
+**判断"什么镜头要什么操作"**：
 
 | 镜头需求 | 用什么 | 理由 |
 |---|---|---|
 | 单一动作/单一情绪 | `kind="image"` + 单帧 | 简单镜头不需要镜头组的开销 |
-| 同一空间多角度（场景一致性强）| `kind="shotSet"`（master+反打+特写+OTS）| 严守 180° 轴线，空间感最强 |
-| 双人对话 | `kind="dialogueShot"`（8 镜头标准）| 建立 + OTS×2 + 特写×2 + 反应×2 + 双人中景 |
-| 武打/追逐/特技/兵器 | `kind="actionShotSet"`（8 大武术机位）| master-wide + tracking + 仰拍 + 俯拍 + Dutch + 慢镜 + POV + reaction |
+| 同一空间多角度（场景一致性强）| image 节点 → ImageMagicToolbar「镜头组」按钮（spawn 4 子节点）| 守 180° 轴线，空间感最强 |
+| 双人对话 | image 节点 → ImageMagicToolbar「对话场景」按钮（spawn 8 子节点）| 建立 + OTS×2 + 特写×2 + 反应×2 + 双人中景 |
+| 武打/追逐/特技/兵器 | image 节点 → ImageMagicToolbar「动作戏」按钮（spawn 8 子节点）| master-wide + tracking + 仰拍 + 俯拍 + Dutch + 慢镜 + POV + reaction |
 
 ---
 
@@ -265,12 +265,7 @@ When the user asks Hermes to **make a video, short film, micro-drama, comic-dram
 
 | kind | 用途 | 跑完后行为 |
 |---|---|---|
-| `image` | 通用文生图（多视图、风格锚、首末帧都用它）| 在节点里显示生成图 |
-| `characterSheet` | 角色多视图（自动 spawn N 张子图）| **跑完自动 spawn N 个独立 image 子节点**，父节点只显示参考图 |
-| `storyboard` | 整片风格锚（25 宫格 / 4 联画也走它）| 跑完显示分镜 |
-| `shotSet` | 同场景镜头组（master+OTS+特写+反打）| **跑完自动 spawn 4-8 个独立 image 子节点** |
-| `dialogueShot` | 双人对话 8 镜头标准 | **跑完自动 spawn 8 个独立 image 子节点** |
-| `actionShotSet` | 动作戏 8 大武术机位 | **跑完自动 spawn 8 个独立 image 子节点** |
+| `image` | 通用文生图（多视图、风格锚、首末帧、参考图都用它）| 在节点里显示生成图；选中后顶部 ImageMagicToolbar 有 8 种操作 |
 | `image2video` | 图生视频（首末帧 + subjectRefs）| 显示视频 |
 | `audio2video` | 音频生视频（口型同步）| 显示视频 |
 | `tts` | 文本转语音 | 显示音频 |
@@ -284,6 +279,8 @@ When the user asks Hermes to **make a video, short film, micro-drama, comic-dram
 | `comicSplit` | 漫画拆格 | 显示拆格图 |
 | `text` | 文本节点（reverse-prompt / 注释 / 中转 prompt）| 文本块 |
 | `preview` | 任意上游输出预览 | 预览块 |
+| `scriptGen` | 故事脚本生成 | 输出分场列表 |
+| `shotGroup` | 多张分镜一致性协调 | 协调后的图 |
 
 ---
 
@@ -422,7 +419,7 @@ canvas_subject_save(
 )
 ```
 
-**🚨 红线：绝对不要再 `canvas_add_node(kind="characterSheet" / "shotSet" / "dialogueShot" / "actionShotSet")`** — 这些 kind 已从 palette 隐藏，是为向下兼容旧画布留的。新画布**只用 `kind="image"` 当父节点**。
+**🚨 红线：`characterSheet / storyboard / shotSet / dialogueShot / actionShotSet` 已从代码中彻底删除。Hermes 只能用 `kind="image"` 当父节点 + ImageMagicToolbar 操作 / canvas_run_character_sheet 快路径 + canvas_spawn_children。**
 
 **反派 / 配角 / 场景 / 道具同理**（每个一个 image 节点 + run_character_sheet + spawn_children）。
 - 场景：`subject_type="scene"`, `view_count=6`（前/左/右/后/俯视/细节）
@@ -534,8 +531,8 @@ contact_image_node = canvas_add_node(
   position_x=550, position_y=300
 )
 canvas_connect(pid, contact_image_node["nodeId"], "images", shot1_video["nodeId"], "subjectRefs")
-# 方法 B（兜底）：直接连 characterSheet
-# canvas_connect(pid, char_hero["nodeId"], "views", shot1_video["nodeId"], "subjectRefs")
+# 方法 B（兜底）：直接连角色 hero image 节点
+# canvas_connect(pid, hero_node["nodeId"], "images", shot1_video["nodeId"], "subjectRefs")
 ```
 
 ### Step 7 — 拼接（videoConcat + cutPattern）
@@ -580,9 +577,9 @@ for v in [shot1_video, shot2_video]:
 
 ```
 1. Sequential 生成（先 hero 再用 hero 当 ref）
-   ↓ characterSheet 节点自动做（执行器内置）
+   ↓ canvas_run_character_sheet 快路径自动做
 2. Identity Lock Prompt 公式（5 维面部锁定）
-   ↓ characterSheet 节点自动加（执行器内置）
+   ↓ canvas_run_character_sheet 自动注入
 3. Contact Sheet 拼大图（pose sheet，1 张拼图当 ref）
    ↓ canvas_compose_contact_sheet 手动调
 4. subjectRefs 端口（image2video 接 contact sheet）
@@ -685,8 +682,8 @@ optimized = canvas_optimize_prompt(
 
 ## ⚠️ 漫剧不崩 14 条红线
 
-1. ❌ characterSheet viewCount 用 3（一致性差）— ✅ 用 6
-2. ❌ characterSheet 跑完不拼 contact sheet — ✅ 跑完立刻拼
+1. ❌ canvas_run_character_sheet view_count 用 3（一致性差）— ✅ 用 6
+2. ❌ 跑完不拼 contact sheet — ✅ 跑完立刻拼
 3. ❌ image2video 不接 subjectRefs — ✅ 必须接
 4. ❌ image2video 不连双关键帧（首+末）— ✅ 必须双关键帧
 5. ❌ 角色 prompt 没 5 维 identity lock — ✅ 必须 5 维（眼/鼻/下颌/唇/肤）
@@ -716,7 +713,7 @@ optimized = canvas_optimize_prompt(
 
 **推荐组合**：
 - 漫剧（60s 内）→ doubao-seedance-2-0（性价比+多模态）
-- 短片（5min）→ veo3.1-fast 主用 + sora-2 文戏 + actionShotSet 走 doubao
+- 短片（5min）→ veo3.1-fast 主用 + sora-2 文戏 + 动作戏走 doubao
 - 多集系列（10+ 集）→ doubao-seedance-2-0 全程（资产沉淀 + 价格）
 
 ---
@@ -725,8 +722,8 @@ optimized = canvas_optimize_prompt(
 
 ```
 画布搭好了。一共 N 个节点：
-- {char_count} 个角色 characterSheet（跑完会自动 spawn N×6 个独立 image 子节点 + 拼了 contact sheet）
-- {scene_count} 个场景 characterSheet（跑完自动 spawn N×6 个独立 image 子节点）
+- {char_count} 个角色 image 节点（已调 canvas_run_character_sheet spawn N×6 个视图子节点 + 拼了 contact sheet）
+- {scene_count} 个场景 image 节点（已 spawn N×6 个视图子节点）
 - 1 个风格锚 image 节点
 - {shot_count} 个镜头 image 节点（首帧 + 末帧成对）
 - {shot_count} 个 image2video 视频节点
@@ -734,7 +731,7 @@ optimized = canvas_optimize_prompt(
 - 1 个 videoConcat 拼接节点
 
 推荐运行顺序：
-1. ▶ 角色立绘 characterSheet（跑完自动 spawn 子节点 + 父节点显示参考图）
+1. ▶ 角色立绘 image 节点 → canvas_run_character_sheet → spawn 子节点 + 拼 contact sheet
 2. ▶ 场景立绘
 3. ▶ 风格锚
 4. ▶ 每镜头首末帧 image
