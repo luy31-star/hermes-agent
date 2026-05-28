@@ -1,7 +1,7 @@
 ---
 name: video-canvas-director
 description: "通过 Hermes 桌面端的无限画布做生产级 AI 漫剧/短片。Hermes 扮演专业导演 + 制片厂主任，**搭画布不直接调 API**。完全对齐 [LibTV 4 模式工作流](https://toolin.ai/blog/seedance-2-libtv-workflow-tutorial)：项目级 4 模式 + 主体库（人物/场景/道具）+ 分镜组 + 4 件套角色一致性。基于 Nano Banana Pro Face Consistency 5 步法 + studiobinder 镜头语言 + 纳米空间引擎/Catimind/有戏 AI 工业实战。强制 Phase Gates：剧本拆解 → 角色 Bible → 镜头规划 → 用户确认后才搭画布。"
-version: 14.0.0
+version: 14.1.0
 license: MIT
 platforms: [macos, linux, windows]
 metadata:
@@ -39,6 +39,72 @@ When the user asks Hermes to **make a video, short film, micro-drama, comic-dram
 > 主体库分 **人物 / 场景 / 道具** 三类，左侧栏可见，**跨项目复用**（这一集做的角色，下一集直接拖出来用）。
 >
 > 创建角色官方流程：**先生成 1 张标准角度的角色图 → 右键"创建主体" → 自动补 9 个角度 → 挑几个最像的留下 → 进入主体库**。
+
+---
+
+## 🚨 全局铁律
+
+### 1. **中文 prompt 强制**
+
+所有节点的 `prompt` / `description` 字段**必须用中文**写。白名单只允许以下英文：
+- 镜头术语缩写：`shotSize / cameraAngle` 等无法翻译的术语 — 但应优先翻译成"特写 / 中景 / 仰角"等
+- 比例：`16:9 / 9:16 / 21:9 / 1:1`（数字）
+- 风格 modifier：`cinematic / wuxia / ink-wash / steadicam` 等行业通用词（可中英混写如"ink-wash 水墨风"）
+- Negative 关键词：可以 `不要换脸 / no face swap` 双语
+
+**禁止**整段英文 prompt（如 "a young man with sword in moonlight..."）— 中文模型对中文 prompt 表现更好（豆包/即梦/可灵都是国产）。
+
+### 2. **节点字段严格对照（不要乱塞字段）**
+
+`canvas_add_node` 的 `data_json` **只能用各 kind 实际定义的字段**。塞了不存在的字段会被服务器忽略，导致镜头参数没生效。
+
+**镜头参数（景别/角度/运镜/光线/色调/焦距）= 写进 prompt 文本**，**不是**当字段塞 data_json。
+
+### 3. **节点真实字段速查**
+
+| kind | 必填字段 | 可选字段 |
+|---|---|---|
+| `image` | `prompt`(中文≥500字)、`imageModel`、`aspectRatio`、`count` | — |
+| `characterSheet` | `name`、`description`(中文≥800字 含 5维 identity lock)、`imageModel` | `referenceImage`、`viewCount`(3/6/9)、`subjectType`("character"/"scene"/"prop"/"face")、`autoSpawn`(默认true) |
+| `storyboard` | `label`、`style`(中文)、`imageModel` | `mode`("single"/"25-grid"/"4-panel-story") |
+| `shotSet` | `description`(中文)、`imageModel` | `shotTypes`(["master","reverse","closeup","ots-a"])、`characterAAxisSide`("left"/"right") |
+| `dialogueShot` | `characterAName`、`characterBName`、`sceneDescription`(中文)、`imageModel` | `dialogue`、`shotSet`(8 镜头 ID 数组) |
+| `actionShotSet` | `description`(中文)、`imageModel` | `actionType`("fight"/"chase"/"stunt"/"wirework"/"sword")、`pacing`("rapid"/"methodical"/"slow-mo")、`chaosLevel`("steadicam"/"handheld")、`axisRule`("preserve"/"break")、`beat`("setup"/"exchanges"/"reversal"/"resolution") |
+| `image2video` | `prompt`(中文≥500字)、`videoModel`、`duration`、`aspectRatio` | `audioRef`、`subjectRefs`(数组) |
+| `tts` | `text`(中文)、`audioModel`、`voice` | — |
+| `musicGen` | `audioModel`、`duration`(2-10s) | `prompt`(中文)、`timingPrompts`([{from,to,prompt}]) |
+| `videoConcat` | `videoOrder`(数组) | `crossfadeSeconds`、`reencode`、`bgmUrl`、`bgmVolume`、`cutPattern`("standard"/"rapid-cut"/"j-cut"/"l-cut"/"montage") |
+
+### 4. **prompt 工业级公式（必背）**
+
+每个 image / image2video 节点的 prompt 必须按以下顺序写**6 段中文**：
+
+```
+【主体动作】少年道袍带血污、半跪入殿；持青铜螭龙剑，剑尖滴血
+【场景环境】凌晨山顶古寺前，月光从左侧 30° 入射，地面青石板渗水
+【光线设计】冷蓝月光为主光（5500K），右侧暖黄烛火做边缘光（3200K）
+【镜头语言】特写→中景，35mm 焦距，浅景深，平视微仰
+【色调氛围】青冷 + 银白，整体偏暗影调，颗粒感 film-grain-light
+【运镜节奏】固定（首帧不动）→ 1s 后慢速推进；3 秒镜头第 0 帧
+
+Identity Lock：保持 Phase 2 角色 Bible 5 维面部特征
+（单眼皮杏仁眼、高挺直鼻、清瘦尖下巴、薄唇、玉白肤色）
++ 5 项标志物（脖颈枷锁道痕、虎口血丝、青铜螭龙剑、灰渍道袍、眼底金光）
+
+Negative：不要现代服饰、不要笑容、不要其他角色、不要文字水印、
+不要面部毛发、不要变形面部、不要多余肢体
+```
+
+**字符数**：image ≥500，image2video ≥800（视频还要含动作弧 + 时长意图 + Foley 音效描述）。
+
+### 5. **不预跑、不预连**（v14 LibTV 协作铁律）
+
+- ❌ 不调 `canvas_run_node` 主动跑生图/生视频节点
+- ❌ 不调 `canvas_connect` 预连下游线
+- ✅ 只 add_node + 写好 prompt
+- ✅ 让用户点 ▶ 跑节点、挑满意结果、手动拉线到下游
+
+OK 工具：`canvas_segment_script / canvas_run_script_doctor / canvas_optimize_prompt / canvas_compose_contact_sheet / canvas_film_analysis`（这些是分析/工具调用，不烧生成配额）。
 
 ---
 
@@ -346,17 +412,19 @@ shot1_first = canvas_add_node(
   project_id=pid,
   kind="image",
   data_json=json.dumps({
-    "prompt": "<≥500 字符工业级 prompt — 含 6 类信息（主体/场景/光线/镜头/色调/运镜）+ Identity Lock + ≥7 negative>",
+    "prompt": """【主体动作】白衣少年剑仙踉跄入殿，半跪在地，残剑滴血；
+【场景环境】凌晨山顶古寺前，月光从左侧 30° 入射，地面青石板渗水；
+【光线设计】冷蓝月光为主光（5500K），右侧暖黄烛火做边缘光（3200K）；
+【镜头语言】特写→中景，35mm 焦距，浅景深，平视微仰；
+【色调氛围】青冷 + 银白，整体偏暗影调，电影感 ink-wash 水墨风；
+【运镜节奏】固定（首帧不动），3 秒镜头的第 0 帧；
+
+Identity Lock：保持白衣少年剑仙的 5 维面部特征（单眼皮杏仁眼、高挺直鼻、清瘦尖下巴、薄唇、玉白肤色）+ 5 项标志物（脖颈枷锁道痕、虎口血丝、青铜螭龙剑、灰渍道袍、眼底金光）；
+
+Negative：不要现代服饰、不要笑容、不要其他角色、不要文字水印、不要面部毛发、不要变形面部、不要多余肢体""",
     "imageModel": "doubao-seedream-5.0",
     "aspectRatio": "16:9",
-    "count": 1,
-    "shotSize": "wide shot",
-    "cameraAngle": "eye level",
-    "cameraMovement": "static",
-    "lighting": "moonlit, cool blue key light",
-    "colorTone": "teal-silver",
-    "lens": "35mm",
-    "styleRef": "cinematic wuxia ink-wash"
+    "count": 1
   }),
   position_x=700, position_y=50
 )
