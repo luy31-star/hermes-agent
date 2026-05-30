@@ -341,11 +341,16 @@ class TestXiaomiAuxiliary:
         from agent.auxiliary_client import _API_KEY_PROVIDER_AUX_MODELS
         assert "xiaomi" not in _API_KEY_PROVIDER_AUX_MODELS
 
-    def test_vision_model_override(self):
-        """Xiaomi vision tasks should use mimo-v2.5 (multimodal), not the main model."""
+    def test_xiaomi_vision_uses_main_model_not_override(self):
+        """Xiaomi vision must fall through to the user's main model (mimo-v2.5-pro).
+
+        Regression: a hardcoded override forced xiaomi → mimo-v2.5, which
+        tokenplan accounts (authorized only for mimo-v2.5-pro) reject with
+        401 Invalid API Key. xiaomi must NOT be in the override map so the
+        main model + is_vision=True path is used.
+        """
         from agent.auxiliary_client import _PROVIDER_VISION_MODELS
-        assert "xiaomi" in _PROVIDER_VISION_MODELS
-        assert _PROVIDER_VISION_MODELS["xiaomi"] == "mimo-v2.5"
+        assert "xiaomi" not in _PROVIDER_VISION_MODELS
 
 
 # =============================================================================

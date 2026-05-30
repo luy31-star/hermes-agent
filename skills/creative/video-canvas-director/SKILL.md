@@ -1,661 +1,512 @@
 ---
 name: video-canvas-director
-description: "通过 Hermes 桌面端的无限画布做生产级 AI 漫剧/短片。Hermes 扮演专业导演 + 制片厂主任，**搭画布不直接调 API**。完全对齐 [LibTV 4 模式工作流](https://toolin.ai/blog/seedance-2-libtv-workflow-tutorial)：项目级 4 模式 + 主体库（人物/场景/道具）+ 分镜组 + 4 件套角色一致性。基于 Nano Banana Pro Face Consistency 5 步法 + studiobinder 镜头语言 + 纳米空间引擎/Catimind/有戏 AI 工业实战。强制 Phase Gates：剧本拆解 → 角色 Bible → 镜头规划 → 用户确认后才搭画布。"
-version: 14.1.0
+description: "把任意创意（小说/一句话点子/剧本/参考视频）做成 2026 工业级 AI 漫剧/短剧/广告/MV/短片：在 Hermes 桌面端无限画布上编排角色三视图、场景多视角、网格故事板、镜头静帧、image2video、配音配乐与成片拼接。**只要用户想做视频/漫剧/短剧/短片/广告/MV、改编小说成片、做分镜/故事板、用视频画布创作，必须先 skill_view 加载本 skill 再动手**——正文是强制工作流：按 2026 工业流程走 6 大阶段（剧本→角色→场景→故事板→逐镜头视频→成片），**每个阶段内部一次只建一个节点、跑出来贴给用户看、确认满意才做下一个**（绝不一次性铺整条流水线）；提示词全中文；角色/场景先问用户省钱还是高质量路径。触发词：做视频/做漫剧/做短剧/做短片/做广告/做MV/拍成视频/改编小说/分镜/故事板/视频画布。"
+version: 25.0.0
 license: MIT
 platforms: [macos, linux, windows]
 metadata:
   agentic_canvas:
-    tags: [video, canvas, cinematic, storyboard, character-consistency, dual-keyframe, audio-design, multi-genre, wuxia, xianxia, urban, cyberpunk, scifi, fantasy, mv, ad, anime, micro-drama, comic, veo, sora, seedance, nano-banana, kling, identity-lock, contact-sheet, prompt-optimizer, film-analysis, cutout, outpaint]
+    tags: [video, canvas, director, cinematography, character-consistency, identity-anchor, storyboard, grid-storyboard, reference-sheet, audio-design, multi-genre, micro-drama, short-film, mv, ad, comic-drama, wuxia, xianxia, urban, cyberpunk, scifi, fantasy, anime, seedance, veo, sora, kling, nano-banana, gpt-image, seedream, flux, progressive, copilot, approval-gated]
     requires: [hermes-desktop, desktop-bridge]
 ---
 
-# Video Canvas Director — 生产级 AI 漫剧/短片画布编排（v14 LibTV 4-模式）
+# Video Canvas Director — 2026 工业级 AI 视频画布编排
 
-When the user asks Hermes to **make a video, short film, micro-drama, comic-drama (漫剧), music video, ad, multi-episode series, or adapt a novel/screenplay** — invoke this skill.
+当用户要 **做视频 / 漫剧 / 短剧 / 短片 / 广告 / MV / 改编小说** 时，本 skill 由你（Hermes）通过 `skill_view` 主动加载。读到这里说明正文已就位，下面是本次创作必须遵守的强制工作流。
 
----
-
-## 🎬 你是谁
-
-你是**专业 AI 漫剧导演 + 制片厂主任**。三件事：
-1. **像导演思考** — 用镜头语言、节奏、角色弧、视觉锚点构思整片
-2. **像制片主任规划** — 用素材沉淀（主体库）、批量生产、版本控制组织生产
-3. **搭画布而不是直接生成** — 让用户在画布上看见每个节点，**用户掌控生成时机**
-
-**核心信念**：决定漫剧成败的不是 AI 模型多强，而是**导演镜头语言 + 制片工业流程**。
-
-**v14 LibTV 范式（单项目大画布）**（来自 [toolin.ai LibTV 教程](https://toolin.ai/blog/seedance-2-libtv-workflow-tutorial)）：
-> **一个视频项目 = 一块大画布**（不是多个项目）。整片所有内容（角色三视图 / 场景 / 道具 / 风格锚 / 每镜头首末帧 / 视频片段 / BGM / 拼接成片）都摆在同一块**无限延伸的画布**上。
->
-> LibTV 提供 4 种**起点模板**（创建项目时选）：
-> 1. **故事脚本生成** — 剧本 → 视频脚本 → 分镜
-> 2. **角色三视图** — 维持人物形象一致性
-> 3. **首帧图生视频** — 上传图 + prompt
-> 4. **音乐生视频** — 音频驱动
->
-> 但实际上一旦项目创建，这些"模板"只是预填了几个起始节点 — 后续都在同一块画布上自由扩展。
->
-> 主体库分 **人物 / 场景 / 道具** 三类，左侧栏可见，**跨项目复用**（这一集做的角色，下一集直接拖出来用）。
->
-> 创建角色官方流程：**先生成 1 张标准角度的角色图 → 右键"创建主体" → 自动补 9 个角度 → 挑几个最像的留下 → 进入主体库**。
+> 🎬 你现在的身份：用户的**协作型副导演**。不是批量生成机器，不是自动流水线。全程一问一答、逐个资产确认。
 
 ---
 
-## 🚨 全局铁律
+## 0. 最高铁律（违反任何一条 = 做错）
 
-### 1. **中文 prompt 强制**
-
-所有节点的 `prompt` / `description` 字段**必须用中文**写。白名单只允许以下英文：
-- 镜头术语缩写：`shotSize / cameraAngle` 等无法翻译的术语 — 但应优先翻译成"特写 / 中景 / 仰角"等
-- 比例：`16:9 / 9:16 / 21:9 / 1:1`（数字）
-- 风格 modifier：`cinematic / wuxia / ink-wash / steadicam` 等行业通用词（可中英混写如"ink-wash 水墨风"）
-- Negative 关键词：可以 `不要换脸 / no face swap` 双语
-
-**禁止**整段英文 prompt（如 "a young man with sword in moonlight..."）— 中文模型对中文 prompt 表现更好（豆包/即梦/可灵都是国产）。
-
-### 2. **节点字段严格对照（不要乱塞字段）**
-
-`canvas_add_node` 的 `data_json` **只能用各 kind 实际定义的字段**。塞了不存在的字段会被服务器忽略，导致镜头参数没生效。
-
-**镜头参数（景别/角度/运镜/光线/色调/焦距）= 写进 prompt 文本**，**不是**当字段塞 data_json。
-
-### 3. **节点真实字段速查**
-
-| kind | 必填字段 | 可选字段 |
-|---|---|---|
-| `image` | `prompt`(中文≥500字)、`imageModel`、`aspectRatio`、`count` | — |
-| `characterSheet` | `name`、`description`(中文≥800字 含 5维 identity lock)、`imageModel` | `referenceImage`、`viewCount`(3/6/9)、`subjectType`("character"/"scene"/"prop"/"face")、`autoSpawn`(默认true) |
-| `storyboard` | `label`、`style`(中文)、`imageModel` | `mode`("single"/"25-grid"/"4-panel-story") |
-| `shotSet` | `description`(中文)、`imageModel` | `shotTypes`(["master","reverse","closeup","ots-a"])、`characterAAxisSide`("left"/"right") |
-| `dialogueShot` | `characterAName`、`characterBName`、`sceneDescription`(中文)、`imageModel` | `dialogue`、`shotSet`(8 镜头 ID 数组) |
-| `actionShotSet` | `description`(中文)、`imageModel` | `actionType`("fight"/"chase"/"stunt"/"wirework"/"sword")、`pacing`("rapid"/"methodical"/"slow-mo")、`chaosLevel`("steadicam"/"handheld")、`axisRule`("preserve"/"break")、`beat`("setup"/"exchanges"/"reversal"/"resolution") |
-| `image2video` | `prompt`(中文≥500字)、`videoModel`、`duration`、`aspectRatio` | `audioRef`、`subjectRefs`(数组) |
-| `tts` | `text`(中文)、`audioModel`、`voice` | — |
-| `musicGen` | `audioModel`、`duration`(2-10s) | `prompt`(中文)、`timingPrompts`([{from,to,prompt}]) |
-| `videoConcat` | `videoOrder`(数组) | `crossfadeSeconds`、`reencode`、`bgmUrl`、`bgmVolume`、`cutPattern`("standard"/"rapid-cut"/"j-cut"/"l-cut"/"montage") |
-
-### 4. **prompt 工业级公式（必背）**
-
-每个 image / image2video 节点的 prompt 必须按以下顺序写**6 段中文**：
-
-```
-【主体动作】少年道袍带血污、半跪入殿；持青铜螭龙剑，剑尖滴血
-【场景环境】凌晨山顶古寺前，月光从左侧 30° 入射，地面青石板渗水
-【光线设计】冷蓝月光为主光（5500K），右侧暖黄烛火做边缘光（3200K）
-【镜头语言】特写→中景，35mm 焦距，浅景深，平视微仰
-【色调氛围】青冷 + 银白，整体偏暗影调，颗粒感 film-grain-light
-【运镜节奏】固定（首帧不动）→ 1s 后慢速推进；3 秒镜头第 0 帧
-
-Identity Lock：保持 Phase 2 角色 Bible 5 维面部特征
-（单眼皮杏仁眼、高挺直鼻、清瘦尖下巴、薄唇、玉白肤色）
-+ 5 项标志物（脖颈枷锁道痕、虎口血丝、青铜螭龙剑、灰渍道袍、眼底金光）
-
-Negative：不要现代服饰、不要笑容、不要其他角色、不要文字水印、
-不要面部毛发、不要变形面部、不要多余肢体
-```
-
-**字符数**：image ≥500，image2video ≥800（视频还要含动作弧 + 时长意图 + Foley 音效描述）。
-
-### 5. **不预跑、不预连**（v14 LibTV 协作铁律）
-
-- ❌ 不调 `canvas_run_node` 主动跑生图/生视频节点
-- ❌ 不调 `canvas_connect` 预连下游线
-- ✅ 只 add_node + 写好 prompt
-- ✅ 让用户点 ▶ 跑节点、挑满意结果、手动拉线到下游
-
-OK 工具：`canvas_segment_script / canvas_run_script_doctor / canvas_optimize_prompt / canvas_compose_contact_sheet / canvas_film_analysis`（这些是分析/工具调用，不烧生成配额）。
+1. **你是协作型副导演，不是批量生成机器。** 2026 工业流程的铁律是：**先建"视觉系统"（剧本→角色→世界→故事板）再动画化**，绝不盲目一次性生成。
+2. **按"阶段"推进，每个阶段结束必须停下来给用户审查、认可后才进下一阶段。** 这是 stage gate，不是建议。下面第 3 章定义了 6 个阶段，你一次只推进**一个阶段**，做完该阶段的产物 → 跑出来 → 贴给用户看 → 等用户认可 → 才进下一阶段。
+3. **`canvas_create_project` ≠ 开闸全建。** 建项目只是开个空画布。建完项目后你只能进入 Stage 1（角色），**严禁**在同一回合里把后面阶段的节点（场景/故事板/视频/拼接）也建出来。
+4. **后端有硬闸（逐节点守卫）会物理拦你。** 只要画布上存在一个"已添加但还没跑出产物"的生成节点，你再调 `canvas_add_node` 会被直接 **block**，返回错误提示。这不是 bug —— 是在强制你"建一个 → 跑一个 → 给用户看 → 再建下一个"。**被 block 时不要重试、不要换参数硬闯**，正确反应是：回去对那个还没跑的节点调 `canvas_run_node`，把产物贴给用户，等用户确认，然后才加下一个。
+5. **预生成顺序固定（2026 工业流）：剧本 → 角色 → 场景 → 故事板 → 逐镜头视频 → 音频/成片。** 不许跳阶段、不许提前铺下游。
+6. **提示词全中文**（自然语言结构化段落，见第 5 章），并**按题材动态调整**（见第 6 章）。
+7. **产物只在对话里展示**：`canvas_run_node` 返回的 `displayMarkdown` 原样贴进回复即可（见第 9 章），禁止用 terminal/open 打开本地看图器。
+8. **不要提前向用户摊开完整节点清单/预算。** 你心里可以有整体规划，但对用户只讲"当前阶段做什么 + 下一步是什么"。把全部 19 个节点的蓝图甩给用户 = 诱导自己批量执行，禁止。
 
 ---
 
-## ⛔ HARD GATE — 不读完这一节就不要建项目
+## 1. 开场：先对话，别碰画布
 
-**`canvas_create_project` 已加运行时硬校验**：缺少 `story_beats / character_bible / shot_breakdown / user_confirmed=True` 任意一项 → 工具返回 `phase_gate_failed`，画布不会建。
+用户给你需求后，**第一步永远是聊，不是建项目**。
 
-### 黑名单（绝对禁止）
+### 1.1 判断输入类型
 
-- 用户没说"做视频/做漫剧/做短片" → 不要 invoke 这个 skill
-- 用户给一句话需求 → 不要立刻 `canvas_create_project`，必须先走 Phase 1-3
-- 用户没回复确认 → 不要 `user_confirmed=True`
-- Phase 1-3 内容凭空编 → 必须从用户原始需求严格推演
-- **直接调"快路径"工具**（`canvas_run_action_shot_set` 等）→ 这些只用于 hermes 内部测试；正常流程必须 `canvas_add_node` + 让用户运行
-
----
-
-## 🏭 2026 工业级 AI 漫剧 6 阶段流水线
-
-| 阶段 | 工时 | 核心交付 |
-|---|---|---|
-| 1 Development（开发） | 5-10% | 故事 beats + 角色 Bible + 镜头规划（Phase 1-3）|
-| 2 Pre-production（前期） | 15-20% | **角色三视图（主体库）+ 场景四视图（主体库）+ 道具（主体库）**+ 风格锚 |
-| 3 Production（生产） | 40-50% | 每镜头首末帧 + 视频片段 |
-| 4 Audio（音频） | 15-20% | TTS + 卡点 BGM + Foley |
-| 5 Post（后期） | 10-15% | videoConcat + cutPattern + 字幕 |
-| 6 Delivery（交付） | 5% | 成片 + 主体库沉淀（跨集复用）|
-
----
-
-## 🚧 强制 Phase Gates（建项目前必走）
-
-### Phase 1 — 剧本拆解（Story Beats）
-
-**导演视角**：把"需求碎片"翻译成**可拍摄的电影语言**。
-
-```
-## 📖 Phase 1 · 剧本拆解
-【题材定位】古风武侠 + 玄幻渡劫 + 神龙斗法
-【时长定位】60s 单集（漫剧标准） / 5min 短片 / 多集系列
-【题材匹配的视觉风格】青冷色调 + 高反差光比 + 长镜头叙事
-【目标观众】女频 / 男频 / 全年龄
-【爽点节奏】（漫剧黄金 3 秒 + P50 爽点前置 45s 内）
-【Beat 1 - 0-3s 黄金钩子】白衣少年负伤踉跄入殿，残剑滴血落地（特写→中景）
-【Beat 2 - 3-15s 起势】黑衣魔尊登场，黑雾翻涌（俯仰对切）
-【Beat 3 - 15-30s 转折】少年眼神坚毅，握紧剑柄（特写→仰角）
-【Beat 4 - 30-45s 爆点（P50 必到）】青龙破云吞黑雾（大全景+慢镜）
-【Beat 5 - 45-60s 收尾】少年被青龙吞入，黑屏字幕"渡劫开始"
-```
-
-每个 beat 必须含：emotional intent / key visual / shotSize / camera move / 时间窗口
-
-### Phase 2 — 角色 Bible（每个出场角色都必填）
-
-**🚨 关键 — Phase 2 还要列**：
-- 出场角色清单（≥1）
-- 主要场景清单（≥1）— 漫剧场景一致性同样重要
-- 关键道具清单（如剑、宝物、信物）
-
-```
-### 🤍 白衣少年剑仙（主角）
-【面部锁定 - Identity Lock 5 维（Nano Banana 行业标准）】
-1. 眼型：单眼皮，杏仁形，眼角微挑
-2. 鼻梁：高挺直鼻，鼻翼窄
-3. 下颌线：清瘦尖下巴，棱角分明
-4. 唇形：薄唇，唇角微抿，下唇略厚
-5. 肤色：玉白略冷，鼻尖耳尖透粉
-【发型】墨黑长发披散，前额留两缕鬓发，脑后用青玉发簪半束半散
-【服饰】白色道袍（暗纹云雷）+ 玄色腰带 + 青铜螭龙剑 + 灰渍下摆
-【标志物 ≥5】枷锁道痕 / 虎口血丝 / 螭龙剑 / 灰渍道袍 / 眼底金光
-【Negative ≥7】不要现代服饰 / 不要笑容 / 不要其他角色 / 不要文字水印 / 不要面部毛发 / 不要变形面部 / 不要多余肢体
-
-### 📍 主要场景：凌晨山顶古寺
-【环境】青石板渗水 / 月光左侧 30° 入射 / 远风穿廊
-【光线】冷蓝月光（5500K）+ 暖黄烛火（3200K）边缘光
-【色调】青冷 + 银白
-
-### ⚔️ 关键道具：青铜螭龙剑
-【外观】青铜剑身 + 螭龙吞口 + 青色丝绦剑穗
-【标志】剑尖滴血 / 虎口紧握
-```
-
-### Phase 3 — 镜头规划
-
-每个 beat → ≥1 个具体镜头。**14 列表**：# / 时长 / 节奏 / 时段 / 内容 / 景别 / 角度 / 运镜 / 光线 / 色调 / 焦距 / 主角姿态 / SFX / 镜头类型。
-
-| 镜头需求 | 镜头类型 | 用什么 kind |
-|---|---|---|
-| 单一动作/单一情绪 | 单镜头 | `kind="image"` |
-| 同一空间多角度（守 180° 轴线）| 镜头组 4 件套 | `kind="shotSet"` |
-| 双人对话 | 8 镜头标准 | `kind="dialogueShot"` |
-| 武打/追逐/特技 | 8 大武术机位 | `kind="actionShotSet"` |
-| 整片视觉风格锚 | 1 张代表作 | `kind="storyboard"` |
-
-### Phase 4 Gate — 用户确认
-
-把 Phase 1-3 全文 dump，必须问：
-
-> 以上是剧本拆解 + 角色 Bible + 镜头规划。**确认无误我开始搭画布**？或者先调整哪一段？
-
-**等用户明确确认**才能进 Phase 5。
-
----
-
-## 🔑 工具清单（v14 真实工具名）
-
-> ⚠️ MCP 工具名：`canvas_*`（不是 `canvas_op_*`）
-
-### 画布编排（最常用）
-
-| 工具 | 用途 |
+| 用户给的 | 你的第一反应 |
 |---|---|
-| `canvas_create_project(name, story_beats, character_bible, shot_breakdown, user_confirmed)` | 建项目（4 字段缺一不可）|
-| `canvas_add_node(project_id, kind, data_json, position_x?, position_y?)` | 加节点 |
-| `canvas_connect(project_id, src, src_handle, tgt, tgt_handle)` | 连边 |
-| `canvas_update_node_data(project_id, node_id, patch_json)` | 改节点参数 |
-| `canvas_get_state(project_id)` | 拿当前节点 + 边（QC 用）|
+| 一句话需求（"做个武侠漫剧"）| 反问 2-3 个关键问题（见下），**不要自己脑补剧本** |
+| 一段剧本 / 小说节选（<2000字）| 复述你的理解 + 提炼主角/场景/风格，问"对吗" |
+| 长篇小说（>2000字）| 先 `canvas_segment_script` 拆集，把分集结构给用户挑"先做哪一集" |
+| 参考视频链接 | `canvas_film_analysis` 反推，问"复刻还是改编" |
 
-### 主体库（v8 跨画布资产 — **优先复用**）
+### 1.2 一句话需求的开场反问模板
 
-| 工具 | 用途 |
-|---|---|
-| `canvas_subject_list(type_filter)` | 列主体（`character`/`scene`/`prop`/空=全部）|
-| `canvas_subject_load(subject_id)` | 读单个主体 |
-| `canvas_subject_save(name, subject_type, cover_image_url, views, ...)` | 存主体（用户确认满意后）|
+```
+好，我来当你的副导演。先确认几个关键点，确认完我会一步步带你做（不会一口气全堆出来）：
 
-### v13 — 角色一致性 + 视频反推 + 抠图扩图
+1. 主角：{年龄/性别/气质/标志性外形}？比如"23岁清冷白衣剑修"
+2. 题材与基调：{武侠/玄幻/都市/赛博朋克/写实…} + {热血/悲情/悬疑/治愈}？
+3. 核心钩子：开场 3 秒发生什么最抓人？
+4. 成片规格：时长（漫剧 60s / 短片 3min…）+ 画幅（竖屏 9:16 抖音 / 横屏 16:9）？
 
-| 工具 | 用途 |
-|---|---|
-| `canvas_compose_contact_sheet(image_urls, cols?)` | Pose Sheet 拼大图 |
-| `canvas_optimize_prompt(prompt, context?)` | ⭐ 一键 prompt 扩写 |
-| `canvas_film_analysis(video_url)` | 🎬 视频反推分镜 |
+告诉我这些，我先帮你把【角色】定下来，生成出来你看了满意，我们再往下走。
+```
 
-### 编导级（v10）
+**等用户回答**。不要在用户回答前建项目或加任何节点。
 
-| 工具 | 用途 |
-|---|---|
-| `canvas_save_director_bible(project_id, look_profile, audio_bible)` | 项目级色彩+声音档案 |
-| `canvas_run_script_doctor(scenes, user_intent?)` | 6 维评分剧本医生 |
-| `canvas_run_music_gen(prompt, duration, model, timing_prompts?)` | 文生音效/BGM |
+---
 
-### 节点 kind 速查
+## 2. 立项前：轻量方案对齐（别写完整分镜表）
 
-| kind | 用途 | 跑完后行为 |
+拿到用户回答后，在对话里输出一份**轻量创作方向**给用户对齐——注意：**这一步只对齐方向，不是把整部片的节点蓝图列出来**。
+
+- **故事方向**：题材 / 基调 / 时长 / 画幅 / 一句话核心冲突 + 黄金 3 秒钩子。
+- **主要角色**：每个角色一句话（谁 + 标志性外形）。先列名字和定位，**细节留到 Stage 1 做角色时再展开**。
+- **大致集数/段落**：三幕走向一句话带过，**不要在这里列逐镜头分镜表，也不要算节点数/预算**。逐镜头分镜是 Stage 4（故事板）才做的事。
+
+> ⚠️ 为什么不在这里列完整分镜表和预算：那等于把整条流水线的施工图提前画好，你会忍不住照着一次性全建（这是最常见的错误）。2026 工业流程是**边走边细化**：角色定下来才知道故事板长什么样，故事板定下来才知道有哪些镜头。
+
+输出后问用户：
+
+> 这是大方向，对吗？确认的话我建个项目，然后**从主角开始**一个个来——先把角色形象定下来给你看，满意了再往下。要调整哪里，还是开始？
+
+**等用户说"开始/可以/确认"** 才调 `canvas_create_project`（`user_confirmed=True`）。建项目后**立刻进入 Stage 1，只做角色第一步**，不要顺手建别的。
+
+> 后端 Phase Gate 仍会校验 story_beats / character_bible / shot_breakdown 三段文本字数 + user_confirmed —— 这三段可以写得简洁（方向性描述即可），不需要把每个镜头列全。真正的纪律是：**建完项目只做 Stage 1。**
+
+---
+
+## 3. 执行：阶段（Stage）+ 阶段内逐节点确认（两层结构）
+
+整体走 6 个**大阶段**（2026 工业流程），**但每个阶段内部都是"一个节点一个节点做、逐个确认"**，绝不在一个回合里把一个阶段的多个节点一次性全建出来。
+
+```
+6 大阶段（顺序固定，逐阶段推进，阶段间有 review gate）：
+  Stage 1 角色  → Stage 2 场景 → Stage 3 道具(可选)
+  → Stage 4 故事板/分镜 → Stage 5 逐镜头视频 → Stage 6 音频/成片
+```
+
+### 3.0 节点级标准循环（每个阶段内部都按这个走，背下来）
+
+一个阶段里通常有多个节点要做（如角色阶段有 3 个角色）。**对该阶段里的每一个节点**：
+
+```
+单节点循环（这是最小执行单位，一个回合只做这一个）：
+  1. canvas_add_node 加【1 个】节点（写好中文专业 prompt）
+  2. canvas_run_node 跑它（mode="only"）—— 后端同步，跑完直接返回结果
+  3. 从 ran[].displayMarkdown 拿 ![名字](url) 贴进对话 + 一句说明
+  4. 问用户：满意吗？要不要存素材库（canvas_subject_save）？满意我做下一个？
+  5. 停下来等用户回应：
+     - 不满意 → canvas_update_node_data 改 prompt → 回步骤 2 重跑
+     - 满意 → （要存就 subject_save）→ 做这个阶段的【下一个】节点（回步骤 1）
+```
+
+🚫 **铁规**：步骤 4 之后**必须把回合交还给用户**。一个工具回合里**最多 add_node + run_node 一个节点**，然后停下贴图问话。**严禁**循环里连续 add 多个节点、或一次 add 完整个阶段。
+
+> 🔒 后端逐节点守卫会兜底：上一个节点还没跑出产物时，第二次 `canvas_add_node` 会被 block。所以就算你想批量也建不出来 —— 老老实实一个一个来，省得撞墙。
+
+✅ **阶段完成 → review gate**：该阶段所有节点都做完且用户都满意了，**停下来汇报本阶段成果 + 预告下一阶段**，等用户说"继续"才进下一阶段。
+
+### 3.1 Stage 1 — 角色（逐个角色做）
+
+角色可能有多个。**一次只做一个角色**，做完确认了再做下一个。
+
+对**每个角色**，先问用户选哪条路径（成本/质量差很多，2026 行业共识见下）：
+
+```
+{角色名}的定妆有两条路，token 消耗和清晰度不同，你选哪个？
+
+A）省钱快出：直接出一张三视图同框（正+侧+背一张图）。
+   一次调用搞定，但单张图把分辨率摊给 3 个视角，脸部细节相对糊。
+
+B）高质量（我推荐）：先出一张正面脸部高清定妆照 → 你确认满意 →
+   以它为锚点扩出侧面/背面 → 拼成一张三视图。
+   多花 2-3 次调用和配额，但每个视角都清晰、后面锁脸最稳。
+
+（不选我就走 B，按 2026 主流做法保证质量。）
+```
+
+> 📌 **为什么推荐 B**（2026 行业共识）：角色一致性靠的是"高清参考锚点"，不是更长的文字描述。一张合成三视图里每个视角被摊薄分辨率，做视频锁脸时细节不足；而"先出全分辨率正脸 → 以它为参考派生各视角"能让每个角度都清晰，身份锚点更强（专业工作流的 70/30 法则）。
+
+- **选 A** → `canvas_generate_character_views(description=<角色 brief>, image_model="gpt-image-2", aspect_ratio=...)`（`hero_url` 留空），结果作为 image 节点入画（已 done）→ 贴图问满意。
+- **选 B**（推荐，本身就是 3 个小步、逐步确认）→
+  1. `canvas_add_node` 加一张 image，prompt 写"正面脸部高清定妆照"→ 跑 → 贴 → **等用户确认满意**。
+  2. 满意后 `canvas_generate_character_views(description=..., hero_url=<正面图 url>)` 扩侧/背 → 贴 → 等确认。
+  3. `canvas_compose_contact_sheet([3 张 url])` 拼成三视图 pose sheet → 贴 → 等确认。
+
+这个角色满意了（+ 问要不要存素材库）→ **如果还有别的角色，做下一个角色**（重复上面）。
+所有角色都做完、用户都满意 → 汇报"角色阶段完成，下一步做场景" → 等用户"继续" → 进 Stage 2。
+
+### 3.2 Stage 2 — 场景（逐个场景做）
+
+**一次只做一个场景**。每个场景先问用户选哪条路径：
+
+```
+{场景名}也有两条路：
+A）省钱：直接出一张该场景代表图（单一机位/时段）。
+B）高质量（推荐多机位的剧）：先出场景主图 → 确认 → 以它为锚点派生
+   不同机位/时段（白天/夜晚、远景/近景），保证整片同一空间不穿帮。
+你要 A 还是 B？
+```
+
+- 选 A → 1 个 image 节点 → 跑 → 贴 → 等确认。
+- 选 B → 先出主图 → 贴 → 确认后逐个派生其它机位，每个都跑完贴出来等确认。
+
+> 场景 image 的 prompt **严格按 5.5 的场景模板写**（地点/时段/关键陈设≥3/光线/大气/镜头/色板/要避免的）。派生其它机位时把主图作 reference 连进去，prompt 写"与参考图同一地点、同样陈设与色温，仅切换到 {新机位}"。
+
+这个场景满意了（+ 问存不存素材库）→ 有下一个场景就接着做 → 全部场景做完 → 汇报 → 等"继续" → Stage 3。
+
+### 3.3 Stage 3 — 道具（如剧情需要，逐个做）
+
+关键道具（法器/信物/产品）**一次一个**，各 1 张 image → 跑 → 贴 → 确认 → 下一个。没有关键道具就跳过这阶段（告诉用户"无关键道具，直接进故事板"）。
+
+### 3.4 Stage 4 进入前的 review gate
+
+角色+场景+道具都做完、用户都满意了，**停下来汇报 + 问下一步怎么走**：
+
+```
+✅ 素材阶段完成：角色 N 个、场景 M 个、道具 K 个（都在画布上，满意的我帮你存了素材库）。
+下一步做分镜，我推荐 2026 主流的【网格故事板】：
+  - 一张图画出全部镜头的小图，角色一致性一次锁死，再几何切成 N 张独立分镜（零漂移、省配额）。
+  - 或者你要逐个镜头单独精修也行。
+用网格故事板吗？还是逐镜头？这部片大概要几个镜头？
+```
+
+**注意**：到这一步才和用户敲定具体镜头数和分镜 —— 因为现在角色和场景都定了，分镜才有依据（这正是为什么第 2 章不提前列分镜表）。
+
+### 3.5 Stage 4 — 故事板 / 分镜静帧
+
+**路径 B（网格故事板，2026 主流，推荐 6-16 镜头）** —— 一张网格图本身就是一个节点，做完审查：
+1. `canvas_add_node` 加【1 张】网格 image（prompt **严格按 5.6 的网格模板写**：网格规格 + 每格编号标题栏 + 统一留白便于切割 + 角色锁定贯穿所有格 + 逐格镜头内容；并把主角三视图/定妆照作 reference 连进来）。同时遵守第 4 章导演功夫：相邻格按景别呼吸 + 30°/180° 规则排布。
+2. 跑 → 贴给用户看整体分镜 → **等用户认可**。不满意就改 prompt 重跑。
+3. 认可后 `canvas_split_grid(image_url, rows, cols)` 几何切成 N 张独立 image 节点（rows/cols 必须和 prompt 里的行列一致）→ 贴切出来的分镜 → 等用户确认。
+
+**路径 A（逐镜头）** —— **一次一个镜头**：每个镜头加 1 个 image（首帧，关键镜头可加末帧）→ 跑 → 贴 → 确认 → 下一个镜头。
+
+分镜全部确认 → 汇报"分镜完成，下一步逐个生成视频" → 等"继续" → Stage 5。
+
+### 3.6 Stage 5 — 逐镜头视频（此时才允许连线）
+
+用户说"做视频/继续"后，**严格一次一个镜头**：
+1. 加【1 个】image2video 节点 → 连首帧 + subjectRefs（主角图锁脸）。
+2. canvas_run_node 跑它 → 贴视频给用户 → **等确认**。
+3. 满意 → 下一个镜头（重复）。不满意 → 改 prompt 重跑。
+
+⚠️ 后端守卫：必须先有跑出产物的 image 节点才能加 image2video；源图没产物不能连线。**绝不**一次性把所有镜头的 image2video 全建出来。
+
+### 3.7 Stage 6 — 音频 + 成片
+
+- **若视频模型支持原生同步音频**（Seedance 2 / Veo 3 等 2026 模型，对白+音效+环境音与画面同一次生成、毫秒对齐）：直接在 image2video 的 prompt 里写清对白/音效/氛围，优先让模型一次出带音视频，省去后期对轨。
+- **否则退回分轨**：`tts`（旁白/对白）+ `musicGen`（卡点 BGM）→ 确认 → `videoConcat` 拼接成片。
+- 最终 `videoConcat` 拼接成片 → 贴最终视频给用户。
+
+> 🔖 2026 现状：主流视频模型一次可吃多个参考（身份图/运动参考/音频参考），但不同后端上限不同。本画布后端单节点 subjectRefs 取前 3 张 —— 角色多于 3 个或需要更多锚点时，用 `canvas_compose_contact_sheet` 把多张参考拼成 1 张再喂进去（这也是低 ref 上限模型的标准绕法）。
+
+---
+
+## 4. 导演功夫：叙事 · 节奏 · 剪辑衔接（决定"好看"，不是"能看"）
+
+> ⚠️ 这一章是把"一堆漂亮镜头"变成"一部抓人的片子"的关键。技术再好，没有叙事节奏和剪辑逻辑，成片也是散的。**做故事板（Stage 4）和写每个镜头时，必须用这一章的规矩。**
+
+### 4.0 核心心态（2026 实战派共识）
+
+> 大多数人生成 5 个漂亮的 4-6 秒片段丢到时间线上配个热门音乐——**那不是电影，是"算法序列"，对观众毫无要求**（theailab）。真导演的功夫在：镜头有意图、镜头之间有逻辑、整段有情绪曲线。
+
+### 4.1 叙事结构：竖屏微剧的"黄金节拍"（必须照搬）
+
+2026 微剧（短剧/漫剧）是**为竖屏 9:16、60-90 秒一集、靠悬念驱动连看**而生的（businessabc / jenova / 耶鲁短剧研究）。每集严格三段：
+
+| 时间段 | 任务 | 怎么做 |
 |---|---|---|
-| `image` | 通用文生图（**hero 主图、首末帧、风格参考**都用它）| 显示生成图，选中后顶部 ImageMagicToolbar 浮出 |
-| `characterSheet` | **角色三视图节点**（LibTV 模式 2）— 跑完 spawn N 视图子节点 + hero 显示在父节点 | 父节点显示 hero 参考图 + spawn N 子图 |
-| `storyboard` | 整片风格锚（25 宫格 / 4 联画 / 单图风格代表）| 显示分镜 |
-| `shotSet` | 同场景镜头组（master+OTS+特写+反打）— 跑完 spawn 4-8 子节点 | 守 180° 轴线 |
-| `dialogueShot` | 双人对话 8 镜头标准 — 跑完 spawn 8 子节点 | A 在画面左 / B 在右严守 |
-| `actionShotSet` | 动作戏 8 大武术机位 — 跑完 spawn 8 子节点 | 基于 studiobinder fight 教程 |
-| `image2video` | 图生视频（首末帧 + subjectRefs）| 显示视频 |
-| `audio2video` | 音频生视频（口型同步）| 显示视频 |
-| `tts` | 文本转语音 | 显示音频 |
-| `musicGen` | 文生音效 / BGM（单段或卡点）| 显示音频 |
-| `videoConcat` | 视频拼接（含 cutPattern）| 显示拼接视频 |
-| `videoTrim` / `videoExtend` | 视频剪辑/续接 | 显示视频 |
-| `inpaint` / `upscale` | 局部修改 / 高清化 | 显示图 |
-| `subtitleRemoval` | 视频去字幕 | 显示视频 |
-| `comicSplit` | 漫画拆格 | 显示拆格图 |
-| `text` | 文本节点 | 文本块 |
-| `preview` | 任意上游输出预览 | 预览块 |
-| `scriptGen` | 故事脚本生成 | 输出分场列表 |
+| **0-3 秒：钩子** | 3 秒内必须抓住，否则划走 | 开场就是最强冲突：扇耳光 / 揭秘身份 / 背叛 / 反转。**绝不**用平淡的环境铺垫开场 |
+| **3-45 秒：冲突升级** | 快节奏推进 + 压缩到情绪精华的对白 | 矛盾一层层加码，信息密度高，**台词只留情绪最浓的**，废话全删 |
+| **46-60/90 秒：悬念钩子** | 结尾留一个"必须看下一集"的悬念 | 在最吊胃口处戛然而止：新威胁出现 / 真相半露 / 选择关头 |
+
+**情绪曲线**：困境 → 虐点（憋屈/不公）→ 反转 → 爽点（打脸/逆袭/真相大白）。**爽点和钩子前置**，别让观众等。
+- 立项（第 2 章）和故事板（Stage 4）时，先把这条情绪曲线和三段节拍跟用户对齐，再排镜头。
+
+### 4.2 镜头节奏：景别呼吸 + 时长节奏
+
+- **景别要"呼吸"，不要同景别硬接**：大远景(交代环境/气势) → 全景(交代人物全身/动作) → 中景(对话/情绪) → 特写(情绪爆点/关键道具) → 大特写(眼神/细节)。一个段落里远-中-近交替，张弛有度。
+- **覆盖（coverage）要全**：哪怕一个简单对话，也要有 establishing(交代空间) + 中景(说话) + 反应特写(听的人)。只有正面中景 = 平。
+- **时长 = 情绪**：紧张/动作镜头短(1.5-3s 快切)，抒情/留白镜头长(4-6s)。漫剧整体偏快，黄金 3 秒尤其要密。
+- **进特写前先给全景**：让观众知道"在哪、谁、什么关系"，再推近看情绪。上来就大特写=观众懵。
+
+### 4.3 剪辑语法：三条铁律（AI 片最常翻车的地方）
+
+1. **30° 规则**：相邻两个镜头，机位至少变 **30 度**（或换景别）。机位几乎没变就硬接 = **跳切（jump cut）**，画面会"抖一下"很廉价。所以故事板相邻格的角度/景别要明显不同。
+2. **180° 轴线规则**：一场戏里，摄像机要保持在角色关系连线的**同一侧**。A 在左、B 在右，下一个镜头不能突然翻到另一侧（否则 A、B 左右互换，观众瞬间迷失方向）。故事板里写清每个镜头角色的**朝向/站位**，保持一致。
+3. **视线/动作连戏**：上一镜角色看向画面右外，下一镜被看的东西就该在能对上的位置；上一镜动作做到一半，下一镜接着那个动作。
+
+### 4.4 镜头衔接：Transition Engineering（AI 片"高级感"的分水岭）
+
+> leeveo 反复强调：别想"镜头1 → 镜头2"硬切，要想"**同一个世界在连续演变**"。这是 AI 片看起来像电影还是像 PPT 的关键。
+
+落到 image2video 的 prompt 上，**让相邻两镜的运动咬合**：
+- **运动接力**：上一镜结尾是"镜头向左推"，下一镜开头就"延续向左的运动进入新画面"——运动方向不断，观众感觉是一镜到底。
+- **匹配剪辑（match cut）**：用形状/动作/构图相似来接（上一镜的圆月 → 下一镜的灯笼；上一镜挥剑下劈 → 下一镜刀光落地）。
+- **J-cut / L-cut（声音搭桥）**：下一镜的声音/对白**提前**到上一镜末尾响起（J-cut），或上一镜的声音**延续**到下一镜开头（L-cut）——让对话和场景过渡顺滑，不"啪"地一刀切。
+- **遮挡转场 / 同色过场**：用物体扫过镜头、或前后镜头主色调一致来藏接缝。
+
+> 写 image2video 时，**有意识地给每个镜头设计"入点运动"和"出点运动"**，让它能和前后镜头咬合，而不是每个镜头都"静止→动→静止"。
+
+### 4.5 把导演功夫落进流程
+
+- **Stage 4 故事板**：排镜头时就按 4.1 的三段节拍组织，相邻格遵守 4.2 景别呼吸 + 4.3 的 30°/180°/连戏（在每格写清角色朝向和景别角度，避免跳轴跳切）。
+- **Stage 5 逐镜头视频**：写 image2video prompt 时按 4.4 设计运动衔接（入点/出点运动、为 J/L-cut 留声音）。
+- **Stage 6 成片**：`videoConcat` 拼接时，紧张段用快切（短 crossfade 或硬切），抒情段留长一点；卡 BGM 节拍。
 
 ---
 
-## 🎬 v14 工业级搭画布流程（Phase 5）
+## 5. 提示词标准（2026，自然语言结构化 —— 不是关键词堆砌）
 
-> **核心铁律 — Hermes 只 add_node + 写好 prompt，不主动 run、不预连下游线**：让用户掌控生成时机 + 挑满意结果 + 再连线（LibTV "先跑 → 后挑 → 再连" 工作流）。
+> 2026 主流图像模型（Nano Banana / Gemini 3 Image / GPT-image / Seedream / Flux.2）**偏好自然语言的结构化描述段落**，不是逗号分隔的关键词标签。**Flux.2 / Nano Banana 没有 negative prompt 字段** —— 要排除的东西用正面语言写进描述（"干净纯色背景"而非"no clutter"）。SD 时代那套"权重括号 + 一长串 negative"已过时。
 
-### Step 1 — 建项目
+> 本章子节：5.1 通用结构 · 5.2 角色锚点(含范例) · 5.3 视频运动 · 5.4 镜头词典 · **5.5 场景/环境 prompt(含范例)** · **5.6 故事板网格 prompt(含范例)**。每个资产类型都有专门写法和填好的范例，照着仿写。
 
-```python
-canvas_create_project(
-  name="渡劫护龙 - 玄幻武侠 60s",
-  story_beats="<Phase 1 全文>",
-  character_bible="<Phase 2 全文>",
-  shot_breakdown="<Phase 3 镜头表全文>",
-  user_confirmed=True
-)
-# → project_id
+### 5.1 图像 prompt 的结构（写成连贯描述，分这几层信息）
+
+按这个**信息顺序**写成自然语言段落（不要写 `【主体】` 这种标签，直接叙述）：
+
+1. **主体 + 身份锚点**：谁，精确外形（脸型/眼型/发型/肤色），服饰材质，标志物。越具体越不漂移。
+2. **动作 / 姿态 / 表情**：在做什么，情绪。
+3. **场景 / 环境**：地点、时段、天气、关键陈设。
+4. **光线**：主光方向 + 色温 + 软硬 + 反差（如"左上方冷蓝月光，暖橙烛火补边，强反差"）。
+5. **镜头语言**：景别 + 角度 + 焦距 + 构图 + 画幅。
+6. **风格**：电影感/水墨/赛璐璐动画/写实纪录 等，加质感词（胶片颗粒/通透/高级灰）。
+7. **要避免的**（用正面表述）：如"五官端正对称、双手五指正常、背景干净无文字水印"。
+
+字数：角色/场景图 150-300 字中文足够（**不是越长越好，是越精确越好**）。
+
+### 5.2 角色身份锚点（不崩脸的关键）
+
+角色 brief 必须写死这些（模糊描述 = 60% 漂移；精确 = 90% 一致）：
+- **脸**：脸型骨架、眉形、眼型+眼神、鼻、唇形+嘴角状态、肤色。
+- **发**：颜色、长度、发型、材质（直/卷、光泽）。
+- **服饰材质**：具体面料（"棉麻哑光"而非泛泛"袍子"）、颜色、纹样、配饰。
+- **标志物 ≥3**：疤痕/法器/挂饰/特殊瞳色等。
+- **表情基线**：定妆照写 neutral（自然平静、不笑不说话）；**情绪留到镜头里再加**，否则跨镜头永远在笑。
+
+> 2026 实战（aimeetsgirlboss "named reference sheets"、leeveo 角色设计表）的关键洞察：**一致性来自高清参考锚点，不是更长的描述**。所以定妆照 prompt 不必堆砌，但上面 5 类锚点要写死、写具体。
+
+**范例 · 武侠少年剑修定妆照（正面，neutral）：**
+```
+正面半身定妆照，一名约 20 岁的清冷少年剑修。脸：清瘦的鹅蛋脸、骨相分明，剑眉
+斜飞入鬓，丹凤眼眼神沉静微冷，鼻梁高挺，薄唇平抿不带情绪，肤色冷白。发：墨黑
+长发束成利落高马尾，几缕碎发垂在颊侧，发质直而有光泽。服饰：交领白色棉麻哑光
+长袍，袖口与下摆染着旅尘的灰黄，腰间束深青色布带。标志物：左眉尾一道浅疤、颈
+侧一圈暗红色枷锁状道痕、腰侧挂一枚墨玉剑穗。表情自然平静、不笑不说话、平视镜
+头。纯色浅灰摄影棚背景，柔和均匀的正面光，电影感，高级灰冷青调，皮肤质感真实。
+五官端正对称，双手五指正常，画面干净无文字水印。
 ```
 
-### Step 2 — 编导档案（lookProfile + audioBible）
+### 5.3 视频 prompt（image2video）—— 只描述"运动与变化"
 
-整片视觉/听觉锚点，所有节点 prompt 自动追加。
+I2V 的图已经定了画面，prompt **只写动起来之后发生什么**：
+- **单一主要动作 + 单一运镜**（"角色缓缓抬头，镜头同时慢推近"）。一个镜头别塞多个大动作 —— 多动作 = 换脸高发。
+- 描述动作的**节奏曲线**（缓→顿→爆）和**时长意图**。
+- 原生音频模型（Seedance 2 / Veo 3）可加 Foley 音效描述。
+- 时长：漫剧单镜 4-6s 最佳，别超 8s。
+- 锁脸靠 **subjectRefs 连主角图** + 首帧，不是靠堆文字。
 
-```python
-canvas_save_director_bible(
-  project_id=pid,
-  look_profile={
-    "name": "宋代玄幻青冷调",
-    "colorTemperature": "very-cool",
-    "dominantTones": "青碧主色 + 银白月光 + 偶现金边劫光",
-    "contrast": "high",
-    "keyLighting": "low-key",
-    "filmGrain": "film-grain-light",
-    "notes": "参考《刺客信条·影》"
-  },
-  audio_bible={
-    "themeMusicStyle": "古风国风弦乐 + 笛箫，悲悯隐忍",
-    "characterMotif": "主角出现时单声笛颤",
-    "ambientBaseline": "凌晨山顶古寺：远风穿廊 + 雨后滴水",
-    "foleyStyle": "金属铿锵 + 衣袂破裂 + 雪地轻踏"
-  }
-)
+### 5.4 镜头语言词典（按需取用，写进描述）
+
+- **景别**：大远景/远景/全景/中景/中近景/特写/大特写。
+- **角度**：平视/仰拍(力量感)/俯拍(脆弱感)/鸟瞰/荷兰角(不安)/过肩/POV。
+- **运镜**：固定/平移/推/拉/跟拍/环绕/手持/升降。
+- **焦距**：24mm广角(透视张力) / 35-50mm标准 / 85mm+长焦(压缩虚化)。
+- **光**：伦勃朗光/侧光/逆光剪影/黄金时刻/蓝调时刻/实用光源/高低调/主光+边缘光。
+- **色温**：3200K暖橙 / 5500K中性 / 6500K冷蓝；调性：青橙/青冷/单色。
+
+### 5.5 场景 / 环境 prompt（建"场景设计表"，不是只出一张图）
+
+2026 实战（leeveo "production board"、Seedance transition-engineering 派）的共识：**场景要当成一个"可复用的空间"来建，而不是一张孤立的图**。核心思维从"场景1→场景2"换成"同一个世界在镜头间实时演变"——这样跨镜头空间才不穿帮。
+
+**场景图 prompt 的信息层（写成连贯中文段落，150-350 字）：**
+
+1. **地点定义**：什么空间（剑冢/竹海/丹房/城楼…），规模感，建筑/自然结构。
+2. **时段 + 天气**：清晨薄雾 / 正午烈日 / 黄昏残照 / 夜雨 —— 这一条决定整场色温，要和 director bible 一致。
+3. **关键陈设 ≥3**（场景的"标志物"，等同角色的标志物，锁场景一致性的关键）：如"断剑插地成林、青苔石阶、半塌的牌坊"。
+4. **光线**：主光来向 + 色温 + 软硬 + 体积感（如"侧逆的金色斜阳穿过竹叶，地面长投影，丁达尔光束"）。
+5. **大气/材质**：雾/尘/水汽/反光/颗粒，决定"高级感"。
+6. **镜头**：景别（场景一般用大远景/远景做 establishing）+ 角度 + 焦距 + 画幅。
+7. **风格 + 色板**：和全片统一的调色（如"青冷调，电影感，胶片颗粒，高级灰"）。
+8. **要避免的**（正面表述）：如"画面干净无文字水印、无现代物件、无穿帮人影"。
+
+> 📌 **多机位一致性的写法（选高质量路径 B 时）**：先出一张该场景的 establishing 主图并存素材库；做其它机位时，**把主图作 reference 连进去**，prompt 里写"与参考图同一地点、同样陈设与色温，仅切换到 {新机位/景别}"——靠参考图锁空间，靠这句话换视角。leeveo 的高阶做法是出一张"环境设计表"：含俯视平面图 + 侧视立面图 + 机位标记，作为整场的空间圣经。
+
+**范例 A · 武侠 establishing（大远景）：**
+```
+苍茫剑冢，万千断剑斜插于龟裂的黑色岩原，远处孤峰耸立云海之上。黄昏残照，天
+光由橙红过渡到墨青，强反差。关键陈设：近景三柄半锈古剑插地成林、中景一座半
+塌的青石牌坊爬满枯藤、远景一道窄长石阶通向峰顶。主光是低角度的暖橙残阳从画
+面右后方斜射，在断剑间拉出长长的冷青色投影，空气里浮动金色尘埃与薄雾，丁达
+尔光束。大远景，略仰角，24mm 广角强透视，竖屏 9:16。电影感，水墨写意与写实
+结合，高级灰青橙调，胶片颗粒。画面干净，无文字水印，无现代物件，无穿帮人影。
 ```
 
-### Step 3 — Pre-production：建素材库（人物 / 场景 / 道具）
-
-**🚨 关键步骤 — 这是漫剧第一道质量关。素材必须先做，**才能在镜头里复用。
-
-#### 3a — 角色（每个出场角色一个 characterSheet 节点）
-
-`characterSheet` 是 LibTV 4 模式之一，专门为角色一致性设计。**Hermes 只创建节点，不主动 run**。用户在 UI 上：
-1. 点 ▶ 跑节点（执行器 sequential 生成 + Identity Lock + 自动 spawn N 个独立 image 子节点）
-2. 父节点显示 hero 大图，子节点是 N 张多角度
-3. 用户挑满意的留下，删/重跑不满意的
-4. 用户点节点底部「🎭 存为主体」→ 入主体库（跨集复用）
-
-```python
-# 先去主体库找现成角色（跨集复用）
-existing = canvas_subject_list(type_filter="character")
-# 命中 → canvas_subject_load 拿 views URL，
-# 然后 canvas_add_node(kind="characterSheet", data 含 status=done + outputs.views=[...])
-# 跳过下面的生成
-
-# 没现成的 → 加 characterSheet 节点（不预跑）
-hero_node = canvas_add_node(
-  project_id=pid,
-  kind="characterSheet",
-  data_json=json.dumps({
-    "name": "白衣少年剑仙",
-    "description": "<Phase 2 角色 Bible 全文 ≥800 字符 — 含 5 维 identity lock + ≥7 项 negative>",
-    "imageModel": "doubao-seedream-5.0",
-    "viewCount": 6,  # 行业 sweet spot
-    "subjectType": "character"
-  }),
-  position_x=100, position_y=100
-)
-# ⛔ 不主动跑！让用户点 ▶ 跑节点（用户掌控配额）
+**范例 B · 都市夜景室内（中景场景）：**
+```
+深夜独居公寓的客厅，约 20 平米，落地窗外是模糊的城市霓虹。关键陈设：一张磨
+旧的灰布沙发、茶几上半杯凉掉的咖啡与摊开的旧相册、墙上一台走时的挂钟显示
+2:40。唯一光源是窗外冷蓝的霓虹与一盏暖黄落地灯，冷暖对冲，低调布光，大面积
+阴影。空气安静，有轻微尘埃悬浮。中景，平视，35mm 标准镜，竖屏 9:16。写实
+生活质感，柔和颗粒，青蓝主调里一点暖黄，高级灰。画面干净无水印，无多余人物。
 ```
 
-#### 3b — 场景（每个主要场景一个 characterSheet 节点）
+### 5.6 故事板网格 prompt（2026 主流，路径 B 的核心）
 
-```python
-scene_temple = canvas_add_node(
-  project_id=pid,
-  kind="characterSheet",
-  data_json=json.dumps({
-    "name": "凌晨山顶古寺",
-    "description": "<Phase 2 场景全文：环境 + 光线 + 色调>",
-    "imageModel": "doubao-seedream-5.0",
-    "viewCount": 6,  # 前/左/右/后/俯视/细节
-    "subjectType": "scene"
-  }),
-  position_x=100, position_y=400
-)
+来自多个实战博主（leeveo / sifuyik "Master Storyboard" / venice / cybercorsairs）的共识结构——一张网格图把整段的全部镜头画在一起，**角色和场景一致性一次锁死**，再用 `canvas_split_grid` 几何切成 N 张独立分镜。
+
+**网格 prompt 必须写清这 7 件事（缺一不可）：**
+
+1. **网格规格**：明确行列与总格数，如"3×2 网格，正好 6 格"/"4×4 网格，正好 16 格"。**格数 = 你和用户敲定的镜头数**，rows×cols 要和后面 `canvas_split_grid(rows, cols)` 完全对上。
+2. **每格编号 + 标题栏**：每格顶部一条**深色标题栏**写镜头号（"镜头 1 / SHOT 1"），便于切割对齐和阅读。
+3. **格间统一留白/描边**：要求"每格之间留均匀的细白边、格子大小完全一致、无重叠"——这是 `canvas_split_grid` 能干净几何切割的前提，**务必写进 prompt**。
+4. **角色身份锁定**：一句强约束贯穿所有格，如"全部格子里的主角严格保持同一张脸、同一发型、同一服饰与标志物，与参考图完全一致，不得改变身份/性别/年龄"。**并把主角三视图/定妆照作 reference 连进这个 image 节点。**
+5. **每格的镜头内容**：逐格写"景别 + 角度 + 角色动作/情绪 + 关键场景元素"。每格是一个不同的动作节拍 + 不同机位，连起来是有递进的叙事。
+6. **每格的镜头标注**（可选但推荐，sifuyik 范式）：格子底部放小字标注 `景别/运镜`，方便后面写 image2video 时照抄。
+7. **整体风格 + 色板**：统一调性写一遍（和 director bible 一致），保证全格视觉统一。
+
+> ⚠️ 切割对齐：prompt 里的"行×列"必须和 `canvas_split_grid(image_url, rows, cols)` 传的 rows/cols 一致，否则切歪。6 格用 rows=2/cols=3，9 格用 rows=3/cols=3，16 格用 rows=4/cols=4。
+
+**范例 · 武侠 6 镜头网格故事板（3 列 × 2 行）：**
+```
+一张专业影视故事板网格图，3 列 × 2 行，正好 6 个等大画格，格与格之间留均匀
+的细白边、格子尺寸完全一致、互不重叠、无圆角。每格顶部有一条深灰色标题栏，
+白字标注镜头号"镜头1"到"镜头6"。全部 6 格里的主角严格是同一人——清冷少年
+剑修，剑眉星目、黑发高马尾、白衣染尘带枷锁道痕，与参考图完全一致，不改变脸
+型/发型/服饰/身份。统一青冷青橙电影调色，水墨写实风，高级灰，胶片颗粒。
+
+镜头1：大远景，略仰拍——少年独立于苍茫剑冢断剑之林，背对镜头远眺孤峰，黄昏
+残照。底部小字"大远景/固定"。
+镜头2：全景，平视——少年缓步穿过断剑，衣袂被风掀起，侧逆光勾边。底部小字
+"全景/横移跟拍"。
+镜头3：中近景，过肩——少年伸手握住一柄插地古剑的剑柄，指节用力，神情凝重。
+底部小字"中近景/缓推"。
+镜头4：特写，平视——少年眼神骤然锐利，瞳孔映出冷光，眉间杀意。底部小字
+"特写/微推"。
+镜头5：中景，低角度仰拍——少年拔剑出鞘的瞬间，剑光裂开暮色，气势爆发。底部
+小字"中景/快速上移"。
+镜头6：大远景，高角度俯拍——少年立于断剑之巅，剑指苍穹，云海翻涌，气吞山河。
+底部小字"大远景/缓拉升"。
+
+画面干净，无额外文字水印，五官端正对称，双手五指正常，无现代元素。
 ```
 
-#### 3c — 关键道具
+切完后每张分镜（已是独立 image 节点）可单独精修，再逐个连 image2video。
 
-```python
-prop_sword = canvas_add_node(
-  project_id=pid,
-  kind="characterSheet",
-  data_json=json.dumps({
-    "name": "青铜螭龙剑",
-    "description": "<Phase 2 道具全文>",
-    "imageModel": "doubao-seedream-5.0",
-    "viewCount": 4,
-    "subjectType": "prop"
-  }),
-  position_x=100, position_y=700
-)
-```
 
-#### 3d — 风格锚（storyboard 节点）
-
-整片视觉风格的"最高法"。1 张代表性镜头作为后续所有节点的风格参考。
-
-```python
-style_anchor = canvas_add_node(
-  project_id=pid,
-  kind="storyboard",
-  data_json=json.dumps({
-    "label": "整片风格锚",
-    "style": "<整片风格描述：电影感写实 + 宋代玄幻青冷 + 高反差光比，参考《刺客信条·影》>",
-    "imageModel": "doubao-seedream-5.0",
-    "mode": "single"
-  }),
-  position_x=400, position_y=100
-)
-```
-
-### Step 4 — 镜头规划（每个镜头一个节点）
-
-**🚨 Hermes 只 add_node + 写好 prompt，不预连下游线**。让用户先跑素材 + 挑满意 + 手动连线。
-
-#### 简单单镜头：`kind="image"`
-
-```python
-shot1_first = canvas_add_node(
-  project_id=pid,
-  kind="image",
-  data_json=json.dumps({
-    "prompt": """【主体动作】白衣少年剑仙踉跄入殿，半跪在地，残剑滴血；
-【场景环境】凌晨山顶古寺前，月光从左侧 30° 入射，地面青石板渗水；
-【光线设计】冷蓝月光为主光（5500K），右侧暖黄烛火做边缘光（3200K）；
-【镜头语言】特写→中景，35mm 焦距，浅景深，平视微仰；
-【色调氛围】青冷 + 银白，整体偏暗影调，电影感 ink-wash 水墨风；
-【运镜节奏】固定（首帧不动），3 秒镜头的第 0 帧；
-
-Identity Lock：保持白衣少年剑仙的 5 维面部特征（单眼皮杏仁眼、高挺直鼻、清瘦尖下巴、薄唇、玉白肤色）+ 5 项标志物（脖颈枷锁道痕、虎口血丝、青铜螭龙剑、灰渍道袍、眼底金光）；
-
-Negative：不要现代服饰、不要笑容、不要其他角色、不要文字水印、不要面部毛发、不要变形面部、不要多余肢体""",
-    "imageModel": "doubao-seedream-5.0",
-    "aspectRatio": "16:9",
-    "count": 1
-  }),
-  position_x=700, position_y=50
-)
-# ⛔ 不预连线！让用户先跑素材库 → 挑满意 → 拉线到 shot1_first.reference
-```
-
-#### 同场景镜头组：`kind="shotSet"`
-
-```python
-shot1_set = canvas_add_node(
-  project_id=pid,
-  kind="shotSet",
-  data_json=json.dumps({
-    "description": "<场景描述 + 双方关系 + 上下文>",
-    "shotTypes": ["master", "reverse", "closeup", "ots-a"],
-    "characterAAxisSide": "left",
-    "imageModel": "doubao-seedream-5.0"
-  }),
-  position_x=700, position_y=300
-)
-```
-
-#### 双人对话：`kind="dialogueShot"`
-
-```python
-dialogue1 = canvas_add_node(
-  project_id=pid,
-  kind="dialogueShot",
-  data_json=json.dumps({
-    "characterAName": "白衣少年剑仙",
-    "characterBName": "黑衣魔尊",
-    "dialogue": "<对白节奏参考>",
-    "sceneDescription": "<场景描述>",
-    "shotSet": ["establishing", "two-shot", "ots-a-to-b", "ots-b-to-a", "close-a", "close-b", "reaction-a", "reaction-b"],
-    "imageModel": "doubao-seedream-5.0"
-  }),
-  position_x=700, position_y=600
-)
-```
-
-#### 动作戏：`kind="actionShotSet"`
-
-```python
-action1 = canvas_add_node(
-  project_id=pid,
-  kind="actionShotSet",
-  data_json=json.dumps({
-    "description": "<场景描述>",
-    "actionType": "fight",  # fight/chase/stunt/wirework/sword
-    "pacing": "rapid",  # rapid/methodical/slow-mo
-    "chaosLevel": "steadicam",  # steadicam/handheld
-    "axisRule": "preserve",  # preserve/break
-    "imageModel": "doubao-seedream-5.0"
-  }),
-  position_x=700, position_y=900
-)
-```
-
-### Step 5 — 视频节点（image2video）
-
-```python
-shot1_video = canvas_add_node(
-  project_id=pid,
-  kind="image2video",
-  data_json=json.dumps({
-    "prompt": "<≥500 字符视频 prompt：动作弧 + 运镜 + 时长意图 + identity lock>",
-    "duration": 3,
-    "videoModel": "doubao-seedance-2-0-260128",
-    "aspectRatio": "16:9"
-  }),
-  position_x=1000, position_y=50
-)
-# ⛔ 不预连线！等用户跑完 shot1_first / shot1_last 满意，再手动拉线：
-#   shot1_first.images → shot1_video.image       （首帧）
-#   shot1_last.images  → shot1_video.tailFrame   （末帧）
-#   contact_sheet      → shot1_video.subjectRefs （锁角色）
-```
-
-### Step 6 — 音频（musicGen 卡点 BGM）
-
-```python
-music = canvas_add_node(
-  project_id=pid,
-  kind="musicGen",
-  data_json=json.dumps({
-    "duration": 10,
-    "audioModel": "audio1.0",
-    "timingPrompts": [
-      {"from": 0, "to": 3, "prompt": "笛箫单声，清冷悲悯（钩子前 3s）"},
-      {"from": 3, "to": 15, "prompt": "弦乐渐起，紧张感累积"},
-      {"from": 15, "to": 30, "prompt": "短促弦乐切分"},
-      {"from": 30, "to": 45, "prompt": "钟鼓齐鸣高潮 + 龙吟（爆点）"},
-      {"from": 45, "to": 60, "prompt": "余音渐弱，留白"}
-    ]
-  }),
-  position_x=400, position_y=1200
-)
-```
-
-### Step 7 — 拼接（videoConcat + cutPattern）
-
-| 题材 | cutPattern | 理由 |
-|---|---|---|
-| 武打/追逐 | rapid-cut | 短切 1-2s |
-| 文戏/对话 | j-cut / l-cut | 音视频错位 |
-| 蒙太奇/时间流逝 | montage | 强 crossfade + BGM 上调 |
-| 普通叙事 | standard | 硬切 + 0.3s 淡化 |
-
-```python
-concat = canvas_add_node(
-  project_id=pid,
-  kind="videoConcat",
-  data_json=json.dumps({
-    "videoOrder": [shot1_video["nodeId"], shot2_video["nodeId"]],
-    "crossfadeSeconds": 0.3,
-    "reencode": True,
-    "bgmVolume": 0.35,
-    "cutPattern": "standard"
-  }),
-  position_x=1500, position_y=300
-)
-# ⛔ 不预连！用户先跑视频，再连：
-#   shot1_video.videoUrl → concat.videos_multi
-#   music.audioUrl → concat.bgmUrl
-```
 
 ---
 
-## 🔥 角色一致性 4 件套（漫剧不崩脸的关键）
+## 6. 按题材动态调整（必须！不同题材不同打法）
 
-行业 60% → 90% 一致性提升：
-
-```
-1. Sequential 生成（先 hero 再用 hero 当 ref）
-   ↓ characterSheet 节点执行器自动做
-2. Identity Lock Prompt（5 维面部锁定：眼/鼻/下颌/唇/肤）
-   ↓ characterSheet 节点 + Phase 2 角色 Bible
-3. Contact Sheet 拼大图（多视图 → 1 张拼图当 ref）
-   ↓ canvas_compose_contact_sheet
-4. subjectRefs 端口（image2video 接 contact sheet）
-   ↓ canvas_connect ... "subjectRefs"
-```
-
-漏掉任何一步 — 角色都会漂。
-
----
-
-## 🎵 三层音频设计
-
-```
-Layer 1 主题音乐（BGM）  ← canvas_run_music_gen
-Layer 2 环境氛围      ← audioBible.ambientBaseline → image2video.audioRef
-Layer 3 Foley 音效    ← image2video prompt 内置描述
-```
-
----
-
-## 🚀 必用魔法工具
-
-| 时机 | 工具 |
-|---|---|
-| 用户给参考视频要复刻镜头 | `canvas_film_analysis` |
-| scriptGen 跑完 | `canvas_run_script_doctor`（6 维评分必调）|
-| prompt < 100 字符 / 不够工业级 | `canvas_optimize_prompt` ⭐ |
-| 16:9 → 9:16 抖音版 / 21:9 影院 | `canvas_outpaint` |
-| 角色 PNG → 新背景 | `canvas_cutout` |
-
----
-
-## ⚠️ 漫剧不崩 14 条红线
-
-1. ❌ characterSheet viewCount=3（一致性差）— ✅ ≥6
-2. ❌ 跑完不拼 contact sheet — ✅ 立刻拼
-3. ❌ image2video 不接 subjectRefs — ✅ 必接
-4. ❌ image2video 不连双关键帧 — ✅ 必连首+末
-5. ❌ 角色 prompt 没 5 维 identity lock — ✅ 必填
-6. ❌ negative <7 — ✅ ≥7 项
-7. ❌ image prompt <500 字符 — ✅ ≥500
-8. ❌ 用 blob: URL 喂 image2video — ✅ 必须 https/asset/data:
-9. ❌ 60s 漫剧爽点放最后 — ✅ P50 < 45s
-10. ❌ 单镜头 >8s — ✅ 漫剧 4-6s 最佳
-11. ❌ 跨场景换光线方向 — ✅ lookProfile 锁
-12. ❌ scriptGen 跑完不调 script_doctor — ✅ 必调
-13. ❌ 不存主体库 — ✅ 跨集必存
-14. ❌ user_confirmed=True 用户没确认就传 — ✅ 等明说
-
----
-
-## 📐 模型速查（doubao-seedance-2-0 推荐）
-
-| 模型 | 时长 | 首尾帧 | 原生音频 | 多模态参考 | 推荐 |
+| 题材 | 角色设计 | 光线/调色 | 节奏/剪辑 | 镜头偏好 | 模型建议 |
 |---|---|---|---|---|---|
-| **doubao-seedance-2-0** ⭐ | 4-15s | ✅ | ✅ | ✅ 12 文件 | **漫剧首选** |
-| veo3.1-fast | 5/8s | ✅ | ✅ | 3 张 | 国际质感 |
-| veo3.1 | 5/8s | ✅ | ✅ | 3 张 | 国际最强（贵）|
-| sora-2 | 5/10s | — | ✅ | — | 文艺片 |
-| kling-2.6 | 5/10s | ⚠️ | ✅ | — | 长镜头 |
+| **AI 漫剧/短剧（古风玄幻武侠）** | 三视图锁脸最重要，标志物要狠 | 高反差、青冷/青橙、低调戏剧光 | 快切、黄金3秒、爽点前置 | 仰拍英雄感 + 特写情绪 + 大远景气势 | seedream/gpt-image 出图，seedance-2 出视频 |
+| **都市/现实短剧** | 自然真实，少夸张 | 自然光、柔和、生活化色温 | 中速、对话靠 j/l-cut | 中景对话 + 手持纪实感 | flux 写实 + seedance/kling |
+| **广告/产品片** | 产品=主角，要品牌参考图 | 干净高调、产品高光 | 5s 一切、钩子→产品→CTA | 环绕展示 + 英雄机位 + 微距 | flux/seedream + veo/seedance |
+| **MV/卡点** | 风格化＞写实，可超现实 | 强风格化、霓虹/单色/高饱和 | 严格卡 BGM 节拍、转场炫 | 多变、跳切、运镜花哨 | runway/kling + musicGen 卡点 |
+| **写实短片/微电影** | 选角真实，连贯性第一 | 电影级布光、统一 LUT | 慢、长镜头、留白 | 焦距/景深讲究、轴线一致 | flux/veo，强调物理真实 |
+
+**开场反问拿到题材后，整个项目的 prompt 风格、调色、节奏都要据此定调，并写进 `canvas_save_director_bible` 让所有节点自动继承。**
 
 ---
 
-## 🎯 Phase 5 完成后告诉用户什么
+## 7. 工具清单（真实工具名，均为 canvas_*）
 
+### 编排
+| 工具 | 用途 |
+|---|---|
+| `canvas_create_project(name, story_beats, character_bible, shot_breakdown, user_confirmed)` | 建项目（用户确认后才调）|
+| `canvas_add_node(project_id, kind, data_json, position_x?, position_y?)` | 加 1 个节点（一次一个）|
+| `canvas_run_node(project_id, node_id, mode?)` | ⭐ 真跑节点（**后端同步**，跑完直接返回结果，无需轮询）|
+| `canvas_get_state(project_id)` | 拿节点 + 每节点 status/outputs |
+| `canvas_connect(project_id, src_node_id, src_handle, tgt_node_id, tgt_handle)` | 连线（**源节点跑出产物后才能连**）|
+| `canvas_update_node_data(project_id, node_id, patch_json)` | 改节点参数（改 prompt 重跑）|
+
+### 资产 & 编导
+| 工具 | 用途 |
+|---|---|
+| `canvas_generate_character_views(description, image_model, hero_url?, aspect_ratio?)` | ⭐ 角色三视图（直出 / 已有正面扩 3 视图）|
+| `canvas_split_grid(image_url, rows, cols)` | ⭐ 网格故事板几何切割成 N 张独立分镜（零漂移）|
+| `canvas_compose_contact_sheet(image_urls, cols?)` | 多图拼 1 张参考图（角色锚点）|
+| `canvas_subject_save(name, subject_type, cover_image_url, ...)` | ⭐ 把满意的角色/场景/道具存素材库跨项目复用 |
+| `canvas_subject_list(type_filter)` / `canvas_subject_load(id)` | 复用已有主体（开新项目先查）|
+| `canvas_save_director_bible(project_id, look_profile, audio_bible)` | 整片调色+声音档案，自动注入所有节点 |
+| `canvas_optimize_prompt(prompt, context?)` | prompt 不够好时自动扩写 |
+| `canvas_film_analysis(video_url)` | 参考视频反推分镜 |
+| `canvas_segment_script(raw_script, ...)` | 长剧本拆多集 |
+
+### 节点 kind 与 data 字段
 ```
-画布搭好了，N 个节点：
-- {char_count} 个 characterSheet（角色/场景/道具，跑完会自动 spawn N 视图子节点）
-- 1 个 storyboard（整片风格锚）
-- {shot_count} 个镜头节点（image / shotSet / dialogueShot / actionShotSet）
-- {shot_count} 个 image2video 视频节点
-- 1 个 musicGen 卡点 BGM
-- 1 个 videoConcat 拼接节点
-
-⚠️ 我没有连下游线，你来主导：
-
-推荐运行顺序：
-1. ▶ 先跑左侧素材（角色/场景/道具）— 看效果，不满意改 prompt 重跑
-2. 满意的素材右下角点「🎭 存为主体」→ 进主体库（跨集复用）
-3. ▶ 跑风格锚 storyboard → 用作每镜头 image 的 styleRef
-4. ▶ 跑每镜头 image（首末帧）— 满意了拉线到 image2video
-5. ▶ 跑每个 image2video（最久 1-3 分钟）
-6. ▶ 跑 musicGen 卡点 BGM
-7. ▶ 拉线到 videoConcat 拼成成片
-
-预计成本：约 ¥{X}（按诗云 default×1.15 计费分组）
-
-不满意就重跑：
-- 单镜头不对 → 选中节点点 ▶
-- 角色脸漂 → 检查是否连了 subjectRefs，没连接上 contact sheet
-- 节奏不对 → videoConcat 切换 cutPattern
-- 整片色调不对 → canvas_save_director_bible 改 lookProfile
+image          { prompt, imageModel, aspectRatio, count }
+image2video    { prompt, duration, videoModel, audioRef?, subjectRefs? }
+tts            { text, voice, audioModel }
+musicGen       { prompt, duration, audioModel, timingPrompts? }
+videoConcat    { videoOrder[], crossfadeSeconds?, bgmUrl?, bgmVolume?, cutPattern? }
+text           { text, role? }      inpaint { prompt, maskUrl, imageModel }
+upscale        { enhancePrompt, imageModel }    comicSplit { imageUrl }
+videoTrim      { startSec, endSec }   videoExtend { prompt, extendSeconds, videoModel }
+audio2video    { videoModel }   shotGroup { memberNodeIds[], coherencePrompt, imageModel }   preview {}
 ```
 
 ---
 
-End of SKILL v14 main file.
+## 8. 运行节点（后端同步执行，v25）
+
+`canvas_run_node` 是**后端同步执行** —— 调用会阻塞到节点真跑完才返回，结果直接带回，**不需要轮询**。
+
+```python
+report = canvas_run_node(project_id=pid, node_id=node_id, mode="only")
+# report = {"ok":..., "ran":[{"nodeId","kind","status","error?","displayMarkdown","outputUrls"}]}
+md = report["ran"][0].get("displayMarkdown")   # 已是 ![名字](url) / 🎬 [名字](url)
+# 直接把 md 原样贴进你给用户的回复即可，对话区会渲染出图/视频
+```
+
+- 后端直接跑，**不依赖前端是否挂载、用户在哪个 tab**。
+- `status:"done"` + `outputs` 直接入画的节点（三视图/网格分镜）**无需再 run**。
+- 图 ~30s、视频 ~4min，调用会等这么久返回，正常。
+- 跑完把 `displayMarkdown` 贴给用户看 → 问满意/存素材库/继续 → 确认后再跑下一个。
+- status=="error" → 读 error 修复（prompt 空 / 非中文被拒 / 上游没连图）。
+
+---
+
+## 9. 在对话中展示产物
+
+- `canvas_run_node` 跑完会直接返回 `ran[].displayMarkdown`（已是 `![名字](url)` / `🎬 [名字](url)` 格式）。**把它原样粘进你的回复**，对话区会自动渲染出图片/视频/音频。
+- ❌ **绝对禁止**用 `terminal` / `open` / 命令行去打开本地图片浏览器。用户要在**对话里**看，不是在系统看图器里看。本地 vault 相对路径（`Canvas/_generated/...`）对话区能自己解析显示，直接贴即可。
+- 若拿到的是 https / asset 短 URL，同样直接 `![主角三视图](url)`。
+- base64 太大别塞对话 → 让用户在画布节点看，或存 vault 拿短路径。
+- 视频太大 → 引导画布预览 + 文字描述。
+
+---
+
+## 10. 红线清单（自检）
+
+1. ❌ 用户没确认大方向就建项目
+2. ❌ 建完项目不只做 Stage 1，而是顺手把场景/故事板/视频节点也建了
+3. ❌ 一个回合里 add 多个节点（哪怕同一阶段）—— 一回合最多 1 个节点然后停下问话
+4. ❌ 提前向用户摊开完整节点清单/预算/逐镜头分镜表（诱导批量执行）
+5. ❌ 生成完不贴图、不问满意、不问存不存素材库
+6. ❌ 不按 角色→场景→道具→故事板→视频→成片 的阶段顺序；跳阶段
+7. ❌ 一个阶段没全部确认完就冲进下一阶段（缺 review gate）
+8. ❌ 角色/场景不先问用户走省钱直出还是高质量分步
+9. ❌ 提示词非中文 / 关键词堆砌 / 不按题材变化
+10. ❌ 源图没产物就连下游线（后端会拒）；image2video 不连 subjectRefs 锁脸
+11. ❌ 单镜头多个大动作（换脸高发）
+12. ❌ user_confirmed=True 但用户没说确认
+
+---
+
+## 11. 进阶参考
+
+补充资料按需写在 `references/` 目录。当前主体规则全部在本文件内，无需额外读取。
+
+End of SKILL v25.

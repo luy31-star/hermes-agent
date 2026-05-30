@@ -285,8 +285,13 @@ _API_KEY_PROVIDER_AUX_MODELS: Dict[str, str] = _API_KEY_PROVIDER_AUX_MODELS_FALL
 # When the user's main provider has a dedicated vision/multimodal model that
 # differs from their main chat model, map it here.  The vision auto-detect
 # "exotic provider" branch checks this before falling back to the main model.
+#
+# NOTE: xiaomi was removed from this map in v19 (2026-05): mimo-v2.5-pro
+# (the user's main chat model) supports vision natively and accepts image
+# input; forcing the override to mimo-v2.5 caused 401 "Invalid API Key"
+# errors for tokenplan accounts that only have access to the -pro tier.
+# We now let xiaomi fall through to the main model + is_vision=True path.
 _PROVIDER_VISION_MODELS: Dict[str, str] = {
-    "xiaomi": "mimo-v2.5",
     "zai": "glm-5v-turbo",
 }
 

@@ -245,28 +245,34 @@ class TestResolveVisionMainFirst:
         assert client is not None
         assert model == "xiaomi/mimo-v2-omni"
 
-    def test_exotic_provider_with_vision_override_preserved(self):
-        """xiaomi → mimo-v2.5 override still wins over main_model."""
+    def test_xiaomi_vision_uses_configured_main_model(self):
+        """xiaomi vision must use the user's configured main model, not an override.
+
+        Regression: a hardcoded override forced xiaomi → mimo-v2.5, which
+        tokenplan accounts (authorized only for mimo-v2.5-pro) reject with
+        401 Invalid API Key. With the override removed, the user's main model
+        (mimo-v2.5-pro) must reach resolve_provider_client + is_vision=True.
+        """
         with patch(
             "agent.auxiliary_client._read_main_provider", return_value="xiaomi",
         ), patch(
             "agent.auxiliary_client._read_main_model",
-            return_value="mimo-v2-pro",  # text model
+            return_value="mimo-v2.5-pro",  # the user's configured main model
         ), patch(
             "agent.auxiliary_client.resolve_provider_client"
         ) as mock_resolve, patch(
             "agent.auxiliary_client._resolve_task_provider_model",
             return_value=("auto", None, None, None, None),
         ):
-            mock_resolve.return_value = (MagicMock(), "mimo-v2.5")
+            mock_resolve.return_value = (MagicMock(), "mimo-v2.5-pro")
 
             from agent.auxiliary_client import resolve_vision_provider_client
 
             provider, client, model = resolve_vision_provider_client()
 
         assert provider == "xiaomi"
-        # Should use mimo-v2.5 (vision override), not mimo-v2-pro (text main)
-        assert mock_resolve.call_args.args[1] == "mimo-v2.5"
+        # Must use the configured main model, NOT a hardcoded override.
+        assert mock_resolve.call_args.args[1] == "mimo-v2.5-pro"
         assert mock_resolve.call_args.kwargs.get("is_vision") is True
 
     def test_copilot_vision_sets_vision_header(self, monkeypatch):

@@ -1,0 +1,6 @@
+name: canvas-progressive-guard
+version: 1.0.0
+description: "强制视频画布逐节点推进：当上一个生成节点还没跑出产物时，拦截新的 canvas_add_node，逼 Hermes 一个资产一个资产做、跑出来给用户看、确认后再加下一个。物理约束，纯 pre_tool_call harness 钩子实现，不依赖模型自觉。"
+author: NousResearch
+hooks:
+  - pre_tool_call
