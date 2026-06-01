@@ -26,7 +26,7 @@ metadata:
 
 当用户说“角色卡 / 角色板 / 提案板 / 给导演选角服装看的角色设计表 / 用特定提示词模板制作角色”时，默认理解为 **C 路线**。C 路线必须用 `canvas_add_node(kind="image")` 创建普通 image 节点，`data.aspectRatio` 必须固定为 `"16:9"`，prompt 使用第 5.2.1 的“电影级角色设计表”模板；**不要调用 `canvas_generate_character_views`**。如果 prompt 里有“电影肖像”，它只能是角色板里的一个小分区，绝不能把整张图变成单人电影肖像照。
 
-当用户说“直接做成视频 / 一键做出来 / 自动跑完 / 按镜头表生产”时，**绝不能跳过角色卡、场景、Shot Table 和生产方案选择**。正确理解是：仍按原流程先做角色参考/角色板 → 场景/道具 → Shot Table 镜头表 → 让用户选 A/B/C/D/E 生产方案 → 再生成视频。故事板是方案之一，不是强制唯一方案；如果用户选择故事板参考模式，故事板总览板应作为 `image2video.subjectRefs` 的参考图之一，和人物/物品/场景参考图一起连线，而不只是“生成关键帧之前的说明图”。Shot Table 是镜头生产清单，故事板是导演视觉参考，关键帧/首尾帧是强控制锚点，Ingredients/Components 是资产参考模式；它们可以组合，但不能混为一谈。
+当用户说“直接做成视频 / 一键做出来 / 自动跑完 / 按镜头表生产”时，**绝不能跳过角色卡、场景、段落拆分和模型/模式选择**。正确理解是：仍按原流程先做角色参考/角色板 → 场景/道具 → **集级段落表（segments）→ 选这一段的视频模型 → 选这一段的 generationMode → 段内 Shot Table → 段级故事板** → 再生成视频。**绝不能给整集（60s/90s/3min）画一张总故事板**——必须按段拆，每段一张段级故事板覆盖该段 3-6 个镜头。Shot Table 是段内镜头生产清单，故事板是段级导演视觉参考，关键帧/首尾帧是强控制锚点，Ingredients/Components 是资产参考模式；它们可以组合，但不能混为一谈。
 
 ---
 
@@ -35,8 +35,8 @@ metadata:
 1. **你是协作型副导演，不是批量生成机器。** 2026 工业流程的铁律是：**先建"视觉系统"（剧本→角色→世界→故事板）再动画化**，绝不盲目一次性生成。
 2. **按"阶段"推进，每个阶段结束必须停下来给用户审查、认可后才进下一阶段。** 这是 stage gate，不是建议。下面第 3 章定义了 6 个阶段，你一次只推进**一个阶段**，做完该阶段的产物 → 跑出来 → 贴给用户看 → 等用户认可 → 才进下一阶段。
 3. **`canvas_create_project` ≠ 开闸全建。** 建项目只是开个空画布。建完项目后你只能进入 Stage 1（角色），**严禁**在同一回合里把后面阶段的节点（场景/故事板/视频/拼接）也建出来。
-4. **后端有硬闸（逐节点守卫）会物理拦你。** 只要画布上存在一个"已添加但还没跑出产物"的生成节点，你再调 `canvas_add_node` 会被直接 **block**，返回错误提示。这不是 bug —— 是在强制你"建一个 → 跑一个 → 给用户看 → 再建下一个"。**唯一安全例外**：角色/场景/Shot Table 都确认后，`scriptGen` 跑出 `outputs.scenes`，再用 `canvas_expand_shot_table` 受控补齐生产线；被普通 add/connect block 时不要硬闯。
-5. **预生成顺序固定（2026 工业流）：剧本 → 角色 → 场景 → Shot Table → 选择生产方案 → 逐镜头视频 → 音频/成片。** 不许跳过视觉资产和镜头表；故事板、关键帧、Ingredients/Components、运动参考是可选生产方案，按用户选择执行。
+4. **后端有硬闸（逐节点守卫）会物理拦你。** 只要画布上存在一个"已添加但还没跑出产物"的生成节点，你再调 `canvas_add_node` 会被直接 **block**，返回错误提示。这不是 bug —— 是在强制你"建一个 → 跑一个 → 给用户看 → 再建下一个"。**唯一安全例外**：角色/场景/段落表/段内 Shot Table 都已通过 review gate，`scriptGen` 跑出 `outputs.scenes`，再用 `canvas_expand_shot_table` 受控补齐**这一段**的生产线；被普通 add/connect block 时不要硬闯。
+5. **预生成顺序固定（2026 工业流）：剧本 → 角色 → 场景 → 集级段落表 → 选段模型 + 模式 → 段内 Shot Table → 段级故事板 → 段内逐镜头视频 → 段成片 → 集级 videoConcat → 音频/成片。** 不许跳过段落拆分；每段独立选模型 / 选 generationMode（i2v / ff / ref / imgRef / text2video）。
 6. **提示词全中文**（自然语言结构化段落，见第 5 章），并**按题材动态调整**（见第 6 章）。
 7. **产物只在对话里展示**：`canvas_run_node` 返回的 `displayMarkdown` 原样贴进回复即可（见第 9 章），禁止用 terminal/open 打开本地看图器。
 8. **不要提前向用户摊开完整节点清单/预算。** 你心里可以有整体规划，但对用户只讲"当前阶段做什么 + 下一步是什么"。把全部 19 个节点的蓝图甩给用户 = 诱导自己批量执行，禁止。
@@ -125,7 +125,7 @@ metadata:
 
 > 🔒 后端逐节点守卫会兜底：上一个节点还没跑出产物时，第二次 `canvas_add_node` 会被 block。所以就算你想批量也建不出来 —— 老老实实一个一个来，省得撞墙。
 
-> ✅ Shot Table 例外：`canvas_expand_shot_table` 是受控批量通道，只能在角色卡、场景、Shot Table 镜头表和生产方案已确认、且 `scriptGen.outputs.scenes` 已存在后调用。它不会让你自由乱铺节点，也不能替代角色设计、故事板或参考图连线；它当前主要负责按镜头表幂等补齐 `image(镜头视觉锚点) → image2video → videoConcat`，并写入 `sceneId/sourceScriptId` 便于状态、重试和时间轴管理。若选择故事板参考模式，展开后还必须把故事板总览板、角色、场景、道具连到对应 `image2video.subjectRefs`。
+> ✅ Shot Table 例外：`canvas_expand_shot_table` 是受控批量通道，只能在角色卡、场景、**集级段落表已分段、当前段已选模型 + generationMode、段内 Shot Table 镜头表已确认、段级故事板已生成**之后调用。**每次只展开当前段**（不要一次展开全集！），它会按段内镜头表幂等补齐 `image(镜头视觉锚点) → image2video → 段内 videoConcat`，并写入 `sceneId/segmentId/sourceScriptId` 便于状态、重试和时间轴管理。`generationMode` 决定连什么参考图：i2v 连 image；ff 连 image+tailFrame；ref 连 subjectRefs（image 留空）；imgRef 连 image+subjectRefs；text2video 全空。
 
 ✅ **阶段完成 → review gate**：该阶段所有节点都做完且用户都满意了，**停下来汇报本阶段成果 + 预告下一阶段**，等用户说"继续"才进下一阶段。
 
@@ -207,78 +207,111 @@ B）高质量（推荐多机位的剧）：先出场景主图 → 确认 → 以
 
 ### 3.4 Stage 4 进入前的 review gate
 
-角色+场景+道具都做完、用户都满意了，**停下来汇报 + 进入 Shot Table + 生产方案选择**：
+角色+场景+道具都做完、用户都满意了，**停下来汇报 + 进入分段策略**：
 
 ```
 ✅ 素材阶段完成：角色 N 个、场景 M 个、道具 K 个（都在画布上，满意的我帮你存了素材库）。
-下一步我会先做【Shot Table 镜头表】：每镜头包含标题、时长、景别、运镜、动作、光线、声音和画幅。
-镜头表确认后，我会让你选视频生产方案：
-A 故事板参考模式：先做一张导演故事板总览板，再把它和人物/物品/场景参考图一起连到视频节点。
-B 首尾帧强控制：每个镜头做开始帧+结束帧，最稳但成本更高。
-C Ingredients/Components：直接用角色/场景/道具参考图驱动视频，速度快。
-D 文生视频草稿：先快速出 animatic/粗剪，再挑好镜头精修。
-E 参考视频/运动迁移：有实拍或参考视频时，用它控制动作和运镜。
-这部片大概要几个镜头？如果你想省心，我按时长和节奏先给一个推荐镜头数。
+下一步我先把整集（{总时长}s）拆成几个段落（segment），每段一张段级故事板覆盖该段所有镜头。
+段落数取决于：①剧情节拍 ②你选的视频模型单镜上限 ③总时长 ④画幅。
+告诉我你心里有几段？或我先按三幕节拍 + 模型能力提一个段落表，你审。
 ```
 
-**注意**：到这一步才和用户敲定具体镜头数和镜头设计 —— 因为现在角色和场景都定了，Shot Table 才有依据。
+**注意**：到这一步才和用户敲定「段落怎么分」 —— 因为现在角色/场景已定，模型能力已知，才能分得合理。**绝不能直接给整集出一张总故事板**。
 
-### 3.5 Stage 4 — Shot Table 镜头表 + 生产方案选择
+### 3.5 Stage 4 — 段落（segment）+ Shot Table + 生产方案选择（一段一段做）
 
-默认路径是 **先把镜头设计结构化成 Shot Table，再让用户选生产方案**：
-1. `canvas_add_node(kind="scriptGen")` 创建脚本/Shot Table 节点，prompt 写清已确认的角色卡、场景、画幅、镜头数、三段节拍、每镜头字段要求。
-2. `canvas_run_node(project_id, scriptNodeId, mode="only")` 跑出 `outputs.scenes`，这是可编辑镜头表。
-3. （**可选但推荐**）调 `canvas_run_script_doctor(scenes=outputs.scenes, user_intent=<你立项时记的 1.2 反问回答>)`，6 维度（hook / characterArc / pacing / dialogue / visualizability / emotionalImpact）评审；critical/high 级建议要么直接改 Shot Table，要么明示给用户取舍。
-4. **选 image2video 用的视频模型前**，调 `canvas_list_video_models()` 看每个模型的 `durationsSeconds / tailFrame / nativeAudio / maxResolution`。决策规则：用户要"音频同步" → `nativeAudio=true`；每镜头 >8s → `durationsSeconds` 包含该值；走 B 首尾帧 → `tailFrame=true`；要 4K → 检查 `maxResolution`。
-5. 把镜头表摘要贴给用户确认：镜头号、时长、景别、运镜、动作、光线、声音、预计视频模型。
-6. 让用户选一种生产方案。不要默认把故事板当成唯一正确路径。
+**核心理念**：1 集 1 分半 ≠ 1 张故事板。1 集 = N 段（segment），每段 = 1 张段级故事板 + 3-6 个镜头。N 由"剧情节拍 + 模型单镜时长上限 + 总时长"动态决定，不是固定数字。
 
-**A 故事板参考模式（适合电影感、复杂调度、需要导演总览）**
-1. 用户确认镜头表后，创建 1 张 `image` 节点作为【导演故事板总览板】，画幅固定 `16:9`，prompt 使用 5.6 的故事板总览板模板。
-2. 跑出故事板总览板，贴给用户确认。不满意就改 Shot Table 或故事板 prompt 重跑。
-3. 调 `canvas_expand_shot_table(project_id, scriptNodeId)` 补齐每镜头视频节点。
-4. 对每个 `image2video`：把故事板总览板连到 `subjectRefs`，再把角色/场景/道具参考图也连到 `subjectRefs`（上限 3 张时优先：角色 contact sheet、场景图、故事板总览板；道具可拼进 contact sheet）。
-5. `image2video.image` 仍需要一个主图锚点：可以用该镜头从故事板派生/裁出的镜头小图、或根据故事板生成的镜头起始画面。这个图不是替代故事板，而是视频模型的帧锚。
+#### 3.5.1 第一步：拆段（一次只做这一步）
 
-**B 首尾帧强控制（适合动作准确、转场、广告/产品、剧情关键镜头）**
-1. 每个镜头生成开始帧和结束帧，均继承角色/场景/道具参考。
-2. 开始帧连 `image2video.image`，结束帧连 `image2video.tailFrame`，角色/场景/道具连 `subjectRefs`。
-3. 选择支持 tailFrame 的模型；不支持 tailFrame 时不要假装能控制末帧。
+1. `canvas_add_node(kind="scriptGen")` 创建**集级三幕段落表**节点。prompt 重点写：
+   - 已确认的角色卡、场景、道具
+   - 集级总时长 / 画幅 / 题材
+   - **要求输出 segments 数组**（不是逐镜头！）：每段含 `segmentId / title / startSec / endSec / dramaticBeat / sceneRef / characterFocus / shotCount`
+   - 段数自由：根据剧情节拍 + 时长合理分；典型 60s 短片 3 段 / 90s 漫剧 4-5 段 / 长片每段 8-15s
+2. `canvas_run_node(scriptNodeId, mode="only")` 跑出 `outputs.segments`。
+3. 把段落表摘要贴给你看（段号 / 标题 / 时长 / 节拍 / 涉及角色场景），问：
+   - 段落划分对不对？要不要合并 / 拆分某段？
+   - 先做哪一段？（默认从第一段开始，钩子段优先）
 
-**C Ingredients / Components 参考资产模式（适合高效短剧、角色连续、多场景复用）**
-1. 不强制生成故事板；直接把角色、场景、道具、风格板作为参考资产。
-2. 每镜头按 Shot Table 写运动/运镜 prompt，参考图连 `subjectRefs`。
-3. 适合支持 multi-reference / reference-to-video / components 的模型。
+#### 3.5.2 第二步：选这一段用哪个视频模型 + 生产方案
 
-**D 文生视频草稿 / Animatic 模式（适合探索节奏、低成本试片）**
-1. 先按 Shot Table 用便宜模型跑低清草稿视频或静态 animatic。
-2. 用户挑满意镜头后，再升级为 A/B/C 任一精修方案。
+每段的模型可以不同（钩子段用最强、过场段用便宜、对白段用 nativeAudio）。先调 `canvas_list_video_models()`，按这一段的需求过滤：
 
-**E 参考视频 / 运动迁移 / 实拍混合模式（适合已有动作、舞蹈、镜头运动、产品实拍）**
-1. 用用户提供的参考视频控制运动或镜头节奏。
-2. 再用角色/场景/风格参考图换脸、换景、风格化或重绘。
+| 需求 | 推荐模型 |
+|---|---|
+| 段长 4-15s 灵活 + 音频同步 | Seedance 2.0（doubao-seedance-2-0-260128，诗云）/ Vidu Q3 Pro |
+| 8s 必须 + 双关键帧锁定 + 4K | Veo 3.1 Fast 4K |
+| 6/10s 短片 + 首尾帧 | Hailuo 02 |
+| 长镜 12s + 复杂物理 | Sora 2 Pro |
+| 段内多镜头 ≥ 3 + 角色一致 | Kling Multi Elements / Components 模式 |
 
-### 3.6 Stage 5 — 逐镜头视频
+确认模型后，让用户选这一段的 5 种 `generationMode` 之一（v17 已结构化为节点字段）：
 
-按用户选择的方案执行：
-1. A 模式：故事板总览板必须作为 reference 连到视频节点；不能只把它留在画布上当说明图。
-2. B 模式：必须确认开始帧和结束帧后再跑视频。
-3. C 模式：必须确认参考资产组合和镜头 prompt 后再跑视频。
-4. D 模式：先快速出草稿，用户确认后再升级。
-5. E 模式：先确认参考视频的动作/运镜用途，再做风格或角色迁移。
-6. 每段失败时只重试失败节点，不要重跑整片；如果要调整镜头时长/动作，改对应 image2video 的 `duration/prompt`；如果要调整顺序或裁剪，改最后的 videoConcat 时间轴参数。
+| 模式 ID | 名字 | 适用 | 必需输入 |
+|---|---|---|---|
+| `text2video` | 文生视频 | 探索镜头、Animatic 草稿 | 仅 prompt |
+| `ref` | 全能参考 | 多角色 / 多元素的复杂段，纯 reference-to-video | `subjectRefs` ≥1（image 留空） |
+| `i2v` | 图生视频 | 经典首帧驱动 | image 首帧 |
+| `ff` | 首尾帧 | 强动作准确 / 转场 | image + tailFrame（模型须 tailFrame=true） |
+| `imgRef` | 图片参考 | 首帧 + 风格参考 | image + subjectRefs |
 
-### 3.7 Stage 6 — 时间轴 + 成片
+#### 3.5.3 第三步：拆这一段的 Shot Table（不是整集！）
 
-- `concatNodeId` 是成片时间轴节点。最终合成前，可用 `canvas_update_node_data` 更新 `videoOrder`、`segmentTrims`、`cutPattern`、`crossfadeSeconds`、`bgmUrl`、`bgmVolume`。
-- `segmentTrims` 必须按上游视频节点 ID 写，例如 `{"image2video_xxx": {"startSec": 0.4, "endSec": 5.8}}`，不要按文件名写。
-- 紧张段用 `rapid-cut` 或较小 `crossfadeSeconds`；对白/氛围段用 `j-cut/l-cut`；MV/广告卡点用 `montage` + BGM。
-- **BGM / 音效**：
-  - 单段 BGM → `canvas_run_music_gen(prompt="古风弦乐悲悯环境氛围", duration=10, model="audio1.0")`；拿到 `audio_url` 写进 `videoConcat.bgmUrl`。
-  - MV / 广告卡点 → 用 `timing_prompts=[{"from":0,"to":3,"prompt":"鸟鸣晨光"}, ...]`，输出多段拼接的 BGM，再 `cutPattern="montage"` 配合卡点。
-  - 已经存了 `canvas_save_director_bible` 的 audioBible 时，把 audioBible.themeMusicStyle 直接喂给 music_gen 的 prompt 保持整片声画一致。
-- 最终 `canvas_run_node(project_id, concatNodeId, mode="only")` 拼接成片，直接把返回的 `displayMarkdown` 贴给用户。
-- 用户要"导出 / 存到 Finder"时调 `canvas_save_artifact(url=<最终视频 url>, relative_path="Canvas/<项目名>/final.mp4")`，告诉用户文件在 vault Canvas/ 下。
+模型 + 模式选完后，针对**当前这一段**（不是整集）拆镜头：
+
+1. `canvas_add_node(kind="scriptGen")` 再创建一个**段级 Shot Table** 节点，prompt 写：
+   - 当前段的 `startSec / endSec / dramaticBeat / sceneRef`
+   - 选定的视频模型 + 模式 + 单镜时长上限
+   - 段内镜头数（按段长 / 单镜上限算，例如段长 15s 用 Seedance 2.0 单镜 5s → 3 镜）
+   - 镜头字段：`shotId / startSec / endSec / shotSize / cameraMovement / action / lighting / sound / aspectRatio`
+2. `canvas_run_node(mode="only")` 跑出 `outputs.scenes`（段内的镜头表）。
+3. （可选）`canvas_run_script_doctor` 评审段内节奏/视觉化；critical/high 级建议改完再下一步。
+4. 把段内镜头摘要贴给用户确认。
+
+#### 3.5.4 第四步：画段级故事板（一张图覆盖这一段所有镜头）
+
+1. `canvas_add_node(kind="image", aspectRatio="16:9")` 创建**段级故事板总览板**。
+   - prompt 用 5.6 模板，但**只覆盖当前段的镜头**（3-6 个镜头卡片，不是全集 9 个）
+   - 标题写 `{集名} · 第 {N} 段：{段标题}`
+   - 底部信息区写明：当前段时长、节拍、选定模型、生产模式
+2. `canvas_run_node(mode="only")` 跑出来贴给用户。
+3. 段级故事板满意后才进 Stage 5（这一段的视频生成）。
+
+#### 3.5.5 段间衔接
+
+- 第一段做完后，把第一段的最后一镜末帧（或视频抽帧）保存为参考图，作为第二段第一镜的 `tailFrame` 起点参考 / `subjectRefs` 中的延续锚点 → 自然 match cut。
+- 段间镜头朝向 / 光线 / 主色调延续：在第二段 Shot Table prompt 里写"承接第 1 段第 N 镜的运动方向 / 主色调"。
+- 全集的 `videoConcat` 在所有段都完成后建（见 3.7）。
+
+### 3.6 Stage 5 — 段内逐镜头视频
+
+按段内 Shot Table + 选定 generationMode 执行：
+1. `canvas_expand_shot_table(project_id, scriptNodeId)` 受控展开**这一段**的 image(锚点) → image2video → 段内 videoConcat 流水线。
+2. 按 generationMode 补连参考：
+   - `text2video`：什么都不连，prompt 走起。
+   - `ref`：把角色 contact sheet / 场景 / 道具 / 段级故事板连到 `subjectRefs`（≤3 张）。`image` 端口留空。
+   - `i2v`：每镜头从段级故事板派生 1 张首帧锚点 → 连 `image`。
+   - `ff`：开始帧连 `image`、结束帧连 `tailFrame`，模型须 `tailFrame=true`。
+   - `imgRef`：首帧连 `image` + 风格 / 角色参考连 `subjectRefs`。
+3. 逐个 `canvas_run_node(mode="only")` 跑（每段约 4 分钟）。
+4. 段内视频跑完后，`canvas_run_node` 跑段内 `videoConcat` → 段成片。贴给用户审。
+5. 用户认可后进入下一段（回 3.5.2 选模型 / 模式 / 拆镜头 / 画段级故事板）。失败只重试该镜头，不重跑整段。
+
+### 3.7 Stage 6 — 集级时间轴 + 成片
+
+所有段都跑完且用户都认可后：
+
+1. 在画布上新建一个**集级 `videoConcat`** 节点，`videoOrder` 列出所有段的成片节点 ID（按段序）。
+2. `canvas_update_node_data` 改 `cutPattern`（紧张段 `rapid-cut` / 抒情段 `j-cut/l-cut` / MV 卡点 `montage`）、`segmentTrims`、`crossfadeSeconds`、`bgmUrl`、`bgmVolume`。
+3. **BGM / 音效**：
+   - 整集 BGM → `canvas_run_music_gen(prompt="...", duration=<整集时长>, model="audio1.0")`；audio_url 写进 `videoConcat.bgmUrl`。
+   - 段间不同情绪 → 用 `timing_prompts=[{"from":0,"to":15,"prompt":"鸟鸣晨光"}, ...]` 卡点 BGM。
+   - 已存 `audioBible` 时，把 `audioBible.themeMusicStyle` 喂给 music_gen 保持声画一致。
+4. `canvas_run_node(集级 videoConcat, mode="only")` 拼成片，把 `displayMarkdown` 贴给用户。
+5. 用户要导出 → `canvas_save_artifact(url=最终视频 url, relative_path="Canvas/<项目名>/episode_<N>_final.mp4")`。
+
+> 多集项目：每集开一张 subcanvas（`canvas_create_subcanvas`），main 画布保留集级 videoConcat 时间线。
 
 > 🔖 2026 现状：主流视频模型一次可吃多个参考（身份图/运动参考/音频参考），但不同后端上限不同。本画布后端单节点 subjectRefs 取前 3 张 —— 角色多于 3 个或需要更多锚点时，用 `canvas_compose_contact_sheet` 把多张参考拼成 1 张再喂进去（这也是低 ref 上限模型的标准绕法）。
 
@@ -605,9 +638,16 @@ I2V 的图已经定了画面，prompt **只写动起来之后发生什么**：
 ```
 image          { prompt, imageModel, aspectRatio, count }
                   → handles: images（输出）, reference（输入，可选）
-image2video    { prompt, duration, videoModel, audioRef?, subjectRefs? }
-                  → handles: image（首帧主图，必需）, tailFrame（末帧，需模型支持）,
-                             subjectRefs（≤3 张参考图，含角色/场景/道具/故事板）
+image2video    { prompt, duration, videoModel,
+                 generationMode: "i2v"|"ff"|"ref"|"imgRef"|"text2video",
+                 audioRef?, subjectRefs? }
+                  → handles by mode：
+                     i2v        : image（必需）
+                     ff         : image（必需）+ tailFrame（必需，模型须 tailFrame=true）
+                     ref        : subjectRefs（必需，≤3 张）  ← image 可空，纯参考生视频
+                     imgRef     : image（必需）+ subjectRefs（必需）
+                     text2video : 全空，仅 prompt
+                  → 通用：subjectRefs ≤3 张；audioRef 仅 nativeAudio 模型识别
 tts            { text, voice, audioModel }
 musicGen       { prompt, duration, audioModel, timingPrompts? }
 videoConcat    { videoOrder[], segmentTrims?, crossfadeSeconds?,
@@ -618,8 +658,10 @@ upscale        { enhancePrompt, imageModel }  comicSplit { imageUrl }
 videoTrim      { startSec, endSec }           videoExtend { prompt, extendSeconds, videoModel }
 audio2video    { videoModel }                 preview   {}
 shotGroup      { memberNodeIds[], coherencePrompt, imageModel }
-scriptGen      { prompt, model? }             # 跑出 outputs.scenes 后用 expand_shot_table 展开
+scriptGen      { prompt, model? }             # 可输出 segments（集级段落表）或 scenes（段内镜头表）
 ```
+
+> 🧪 **Dev only — Seedance 2.0 直连**：`videoModel="doubao-seedance-2-0"`（注意：**不是**诗云的 `doubao-seedance-2-0-260128`）走 `http://aigw.fx.ctripcorp.com/llm/100003144/v1`，不走诗云、不计费。需要在桌面端「设置 → 🧪 Dev Only」配置 dev API key。**仅 dev 构建可见**，生产打包会被 tree-shake 掉。诗云上的同款模型 ID 是 `doubao-seedance-2-0-260128`（带日期后缀），两者请勿混用。
 
 
 
