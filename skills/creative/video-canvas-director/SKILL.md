@@ -621,8 +621,7 @@ shotGroup      { memberNodeIds[], coherencePrompt, imageModel }
 scriptGen      { prompt, model? }             # 跑出 outputs.scenes 后用 expand_shot_table 展开
 ```
 
-### 7.11 不要主推的遗留通道
-- `canvas_split_grid(image_url, rows, cols)`：**仅在用户已经提供一张现成多宫格图、并明确要求"切开"时**才用。它只做像素裁切，不理解镜头、不保证一致性。Hermes 不应主动生成网格故事板再切图来做视频。
+
 
 ### 节点 kind 与 data 字段
 ```
