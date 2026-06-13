@@ -466,10 +466,32 @@ def _add_rotating_handler(
             return  # already attached
 
     path.parent.mkdir(parents=True, exist_ok=True)
-    handler = _ManagedRotatingFileHandler(
-        str(path), maxBytes=max_bytes, backupCount=backup_count,
-        encoding="utf-8",
-    )
+    try:
+        handler: logging.Handler = _ManagedRotatingFileHandler(
+            str(path),
+            maxBytes=max_bytes,
+            backupCount=backup_count,
+            encoding="utf-8",
+        )
+    except (PermissionError, OSError) as error:
+        fallback_name = f"fallback:{resolved}"
+        for existing in logger.handlers:
+            if isinstance(existing, logging.StreamHandler) and getattr(
+                existing, "_hermes_fallback_name", None
+            ) == fallback_name:
+                return
+
+        handler = logging.StreamHandler()
+        handler._hermes_fallback_name = fallback_name  # type: ignore[attr-defined]
+        try:
+            import sys
+
+            sys.stderr.write(
+                f"[hermes] logging fallback: failed to open {resolved}: {error}\n"
+            )
+        except Exception:
+            pass
+
     handler.setLevel(level)
     handler.setFormatter(formatter)
     if log_filter is not None:
